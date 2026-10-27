@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../widgets/bottom_nav.dart';
-import 'detection_screen.dart';
-import 'finance_screen.dart';
-import 'harvest_screen.dart';
+import 'detection/detection_screen.dart';
+import 'finance/finance_screen.dart';
+import 'harvest/harvest_screen.dart';
 import 'home_screen.dart';
-import 'weather_screen.dart';
+import 'weather/weather_screen.dart';
 
 class Shell extends StatefulWidget {
   const Shell({super.key});

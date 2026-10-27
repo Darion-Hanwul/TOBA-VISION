@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../widgets/app_header.dart';
 import 'finance_end_screen.dart';
 import 'finance_screen_edit_upload.dart';
 
@@ -97,7 +98,13 @@ class _FinanceScreenState extends State<FinanceScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildTopAppBar(),
+              const AppHeader(
+                backgroundColor: Color(0xE6F4F7F5),
+                showBottomBorder: true,
+                trailing: AppHeaderActionButton(
+                  icon: Icons.person_outline_rounded,
+                ),
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: Column(
@@ -120,57 +127,6 @@ class _FinanceScreenState extends State<FinanceScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  // 1. TopAppBar (Logo Brand & User Profile Icon)
-  Widget _buildTopAppBar() {
-    return Container(
-      height: 65,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      decoration: const BoxDecoration(
-        color: Color(0xE6F4F7F5),
-        border: Border(
-          bottom: BorderSide(color: Color(0x0D022C22)),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF064E3B).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.spa_rounded, color: Color(0xFF064E3B), size: 19),
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'TOBA VISION',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
-                  color: Color(0xFF022C22),
-                ),
-              ),
-            ],
-          ),
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: const Color(0xFF064E3B).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.person_outline_rounded, color: Color(0xFF064E3B), size: 18),
-          ),
-        ],
       ),
     );
   }

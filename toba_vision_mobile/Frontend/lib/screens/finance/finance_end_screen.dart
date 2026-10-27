@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/app_header.dart';
 
 class FinanceEndScreen extends StatelessWidget {
   const FinanceEndScreen({super.key});
@@ -7,21 +8,11 @@ class FinanceEndScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9FB),
-      appBar: AppBar(
+      appBar: const AppHeader(
+        showBack: true,
+        title: 'Rekap Tutup Buku Musim',
         backgroundColor: Colors.white,
-        elevation: 0.5,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF191C1E)),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Rekap Tutup Buku Musim',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF191C1E),
-          ),
-        ),
+        showBottomBorder: true,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),

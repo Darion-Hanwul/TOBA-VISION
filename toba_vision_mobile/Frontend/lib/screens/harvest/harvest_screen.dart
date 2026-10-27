@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/app_header.dart';
 import 'harvest_edit_screen.dart';
 
 class HarvestScreen extends StatefulWidget {
@@ -44,7 +45,22 @@ class _HarvestScreenState extends State<HarvestScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildTopHeader(),
+              AppHeader(
+                backgroundColor: const Color(0xFFF7F9FB),
+                logoIcon: Icons.agriculture_rounded,
+                logoBg: const Color(0xFFA7F3D0),
+                trailing: AppHeaderActionButton(
+                  icon: Icons.sync_rounded,
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Sinkronisasi data panen petani berhasil diperbarui!'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                ),
+              ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
@@ -66,61 +82,6 @@ class _HarvestScreenState extends State<HarvestScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  // 1. TopHeader: Logo & Brand Name + Sync Button
-  Widget _buildTopHeader() {
-    return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      color: const Color(0xFFF7F9FB),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFA7F3D0),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.agriculture_rounded, color: Color(0xFF064E3B), size: 18),
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'TOBA VISION',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.45,
-                  color: Color(0xFF064E3B),
-                ),
-              ),
-            ],
-          ),
-          IconButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Sinkronisasi data panen petani berhasil diperbarui!'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            },
-            icon: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF064E3B).withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.sync_rounded, color: Color(0xFF064E3B), size: 20),
-            ),
-          ),
-        ],
       ),
     );
   }

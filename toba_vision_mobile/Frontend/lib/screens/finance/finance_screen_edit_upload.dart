@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/app_header.dart';
 
 class FinanceScreenEditUpload extends StatefulWidget {
   final Map<String, dynamic>? initialData;
@@ -124,56 +125,19 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9FB),
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(64),
-        child: Container(
+      appBar: AppHeader(
+        showBack: true,
+        title: isEdit ? 'Ubah Pengeluaran' : 'Catat Pengeluaran Baru',
+        backgroundColor: const Color(0xD9F7F9FB),
+        showBottomBorder: true,
+        trailing: Container(
+          width: 32,
+          height: 32,
           decoration: const BoxDecoration(
-            color: Color(0xD9F7F9FB),
-            boxShadow: [
-              BoxShadow(
-                color: Color(0x0A000000),
-                blurRadius: 8,
-                offset: Offset(0, 1),
-              ),
-            ],
+            color: Color(0xFF004C22),
+            shape: BoxShape.circle,
           ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF191C1E)),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        isEdit ? 'Ubah Pengeluaran' : 'Catat Pengeluaran Baru',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.5,
-                          color: Color(0xFF191C1E),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF004C22),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.check_rounded, color: Colors.white, size: 18),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          child: const Icon(Icons.check_rounded, color: Colors.white, size: 18),
         ),
       ),
       body: SingleChildScrollView(

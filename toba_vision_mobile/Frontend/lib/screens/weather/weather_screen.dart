@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../core/theme.dart';
-import '../data/models.dart';
-import '../data/services.dart';
-import '../widgets/async_view.dart';
+import '../../core/theme.dart';
+import '../../data/models.dart';
+import '../../data/services.dart';
+import '../../widgets/async_view.dart';
 
 class WeatherScreen extends StatelessWidget {
   const WeatherScreen({super.key});

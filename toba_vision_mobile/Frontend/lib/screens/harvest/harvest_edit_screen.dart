@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/app_header.dart';
 
 class HarvestEditScreen extends StatefulWidget {
   final int initialStep;
@@ -67,49 +68,19 @@ class _HarvestEditScreenState extends State<HarvestEditScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9FB),
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(64),
-        child: Container(
+      appBar: AppHeader(
+        showBack: true,
+        title: 'Edit Catatan Petikan $stageLabel',
+        backgroundColor: const Color(0xFFF7F9FB),
+        showBottomBorder: true,
+        trailing: Container(
+          width: 32,
+          height: 32,
           decoration: const BoxDecoration(
-            color: Color(0xFFF7F9FB),
-            border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+            color: Color(0xFFA7F3D0),
+            shape: BoxShape.circle,
           ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF064E3B)),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Edit Catatan Petikan $stageLabel',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF064E3B),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFA7F3D0),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.agriculture_rounded, color: Color(0xFF064E3B), size: 18),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          child: const Icon(Icons.agriculture_rounded, color: Color(0xFF064E3B), size: 18),
         ),
       ),
       body: SingleChildScrollView(
