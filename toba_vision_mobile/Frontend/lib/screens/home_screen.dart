@@ -74,21 +74,31 @@ class HomeScreen extends StatelessWidget {
       decoration: cardDeco(radius: 20),
       clipBehavior: Clip.antiAlias,
       child: Column(children: [
-        Row(children: [
-          Expanded(child: _cell(Icons.local_florist_outlined, AppColors.mint, AppColors.green,
-              'Deteksi AI', 'Pindai Daun Kebun', 1)),
-          Container(width: 1, height: 130, color: AppColors.line),
-          Expanded(child: _cell(Icons.wb_sunny_outlined, AppColors.peach, AppColors.amber,
-              'Cuaca', 'Prakiraan & Jemur', 4)),
-        ]),
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: _cell(Icons.local_florist_outlined, AppColors.mint, AppColors.green,
+                  'Deteksi AI', 'Pindai Daun Kebun', 1)),
+              Container(width: 1, color: AppColors.line),
+              Expanded(child: _cell(Icons.wb_sunny_outlined, AppColors.peach, AppColors.amber,
+                  'Cuaca', 'Prakiraan & Jemur', 4)),
+            ],
+          ),
+        ),
         Container(height: 1, color: AppColors.line),
-        Row(children: [
-          Expanded(child: _cell(Icons.payments_outlined, const Color(0xFFE5E7EB), AppColors.ink,
-              'Keuangan', 'Buku Kas & Biaya', 2)),
-          Container(width: 1, height: 130, color: AppColors.line),
-          Expanded(child: _cell(Icons.agriculture_outlined, const Color(0xFFE0E7FF), const Color(0xFF3730A3),
-              'Panen', 'Jadwal & Hasil Petik', 3)),
-        ]),
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: _cell(Icons.payments_outlined, const Color(0xFFE5E7EB), AppColors.ink,
+                  'Keuangan', 'Buku Kas & Biaya', 2)),
+              Container(width: 1, color: AppColors.line),
+              Expanded(child: _cell(Icons.agriculture_outlined, const Color(0xFFE0E7FF), const Color(0xFF3730A3),
+                  'Panen', 'Jadwal & Hasil Petik', 3)),
+            ],
+          ),
+        ),
       ]),
     );
   }
@@ -97,22 +107,34 @@ class HomeScreen extends StatelessWidget {
     return InkWell(
       onTap: () => onNavigate(tab),
       child: Container(
-        height: 130,
-        padding: const EdgeInsets.all(16),
+        constraints: const BoxConstraints(minHeight: 125),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         alignment: Alignment.centerLeft,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 52,
-              height: 52,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(14)),
               child: Icon(icon, color: fg),
             ),
-            const SizedBox(height: 10),
-            Text(title, style: const TextStyle(fontFamily: kSerif, fontSize: 16, fontWeight: FontWeight.w800)),
-            Text(sub, style: const TextStyle(fontFamily: kSerif, fontSize: 12, color: AppColors.muted)),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontFamily: kSerif, fontSize: 15, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              sub,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontFamily: kSerif, fontSize: 11, color: AppColors.muted),
+            ),
           ],
         ),
       ),
