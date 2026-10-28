@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'core/theme.dart';
 import 'data/services.dart';
-import 'screens/shell.dart';
+import 'screens/login_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,7 +18,7 @@ class TobaVisionApp extends StatelessWidget {
       title: 'Toba Vision',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
-      home: const Shell(),
+      home: const LoginScreen(),
     );
   }
 }

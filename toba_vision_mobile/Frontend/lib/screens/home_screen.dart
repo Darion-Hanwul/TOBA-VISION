@@ -4,6 +4,7 @@ import '../data/models.dart';
 import '../data/services.dart';
 import '../widgets/app_header.dart';
 import '../widgets/async_view.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final ValueChanged<int> onNavigate;
@@ -16,7 +17,7 @@ class HomeScreen extends StatelessWidget {
       builder: (context, p) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const AppHeader(
+          AppHeader(
             subtitle: 'TEMANGGUNG, JATENG',
             padding: EdgeInsets.zero,
             height: null,
@@ -26,6 +27,7 @@ class HomeScreen extends StatelessWidget {
             logoIcon: Icons.spa_outlined,
             trailing: AppHeaderActionButton(
               icon: Icons.person_outline_rounded,
+              onTap: () => _showProfileModal(context, p),
             ),
           ),
           const SizedBox(height: 16),
@@ -80,6 +82,269 @@ class HomeScreen extends StatelessWidget {
           _FeatureGrid(onNavigate: onNavigate),
           const SizedBox(height: 20),
           _AiBanner(onTap: () => onNavigate(1)),
+        ],
+      ),
+    );
+  }
+
+  void _showProfileModal(BuildContext context, UserProfile p) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle pill
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Modal Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Profil Petani',
+                  style: TextStyle(
+                    fontFamily: kSerif,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+
+            // Profile Card (Avatar & Nama & Status)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF4F7F5),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0x0D022C22)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      color: AppColors.forest,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.forest.withValues(alpha: 0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.person_rounded, size: 28, color: Colors.white),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                p.name,
+                                style: const TextStyle(
+                                  fontFamily: kSerif,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0F172A),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Icon(Icons.verified_rounded, size: 16, color: Color(0xFF047857)),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'ID: TB-2026-088 • Petani Mitra Aktif',
+                          style: TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Detail Info Box (Nama, Alamat/Wilayah, Kelompok, Lahan)
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                children: [
+                  _buildProfileRow(
+                    icon: Icons.badge_outlined,
+                    label: 'Nama Lengkap',
+                    value: p.name,
+                  ),
+                  const Divider(height: 20, color: Color(0xFFF1F5F9)),
+                  _buildProfileRow(
+                    icon: Icons.location_on_outlined,
+                    label: 'Alamat / Domisili Lahan',
+                    value: '${p.region}, Temanggung, Jawa Tengah',
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Tombol Log Out
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFFFDA4AF), width: 1.5),
+                  backgroundColor: const Color(0xFFFFF1F2),
+                  foregroundColor: const Color(0xFFDC2626),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _confirmLogout(context);
+                },
+                icon: const Icon(Icons.logout_rounded, size: 18),
+                label: const Text(
+                  'Keluar dari Akun (Log Out)',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileRow({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: AppColors.forest.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 16, color: AppColors.forest),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _confirmLogout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.logout_rounded, color: Color(0xFFDC2626)),
+            SizedBox(width: 8),
+            Text(
+              'Konfirmasi Keluar',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Apakah Anda yakin ingin keluar dari akun TOBA VISION? Anda perlu masuk kembali untuk mengakses data kebun.',
+          style: TextStyle(fontSize: 13, height: 1.45, color: Color(0xFF475569)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Anda telah berhasil keluar dari akun.'),
+                  backgroundColor: Color(0xFFDC2626),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
+            },
+            child: const Text('Ya, Keluar', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
         ],
       ),
     );

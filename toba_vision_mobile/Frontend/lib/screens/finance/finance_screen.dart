@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../widgets/app_header.dart';
+import 'finance_all_musim_screen.dart';
 import 'finance_end_screen.dart';
 import 'finance_screen_edit_upload.dart';
 
@@ -12,9 +13,9 @@ class FinanceScreen extends StatefulWidget {
 }
 
 class _FinanceScreenState extends State<FinanceScreen> {
-  int _selectedPeriod = 0; // 0: Bulan Ini, 1: Musim Ini, 2: Semua
+  int _selectedPeriod = 0; // 0: Musim Ini, 1: Semua
 
-  final List<String> _periods = ['Bulan Ini', 'Musim Ini', 'Semua'];
+  final List<String> _periods = ['Musim Ini', 'Semua'];
 
   // Data Kategori
   final List<Map<String, dynamic>> _categories = [
@@ -171,7 +172,18 @@ class _FinanceScreenState extends State<FinanceScreen> {
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: GestureDetector(
-                  onTap: () => setState(() => _selectedPeriod = index),
+                  onTap: () {
+                    if (index == 1) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const FinanceAllMusimScreen(),
+                        ),
+                      );
+                    } else {
+                      setState(() => _selectedPeriod = index);
+                    }
+                  },
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
