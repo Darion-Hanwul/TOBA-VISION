@@ -838,6 +838,25 @@ class _HarvestScreenState extends State<HarvestScreen> {
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xFFBE123C), width: 1.5),
+              foregroundColor: const Color(0xFFBE123C),
+              backgroundColor: const Color(0xFFFFF1F2),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: _showCloseCycleDialog,
+            icon: const Icon(Icons.lock_clock_outlined, size: 20),
+            label: const Text(
+              'Tutup Buku Siklus Padi',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ),
         const SizedBox(height: 8),
         const Text(
           'Data timbangan akan terintegrasi langsung ke buku kas panen perkebunan.',
@@ -845,6 +864,50 @@ class _HarvestScreenState extends State<HarvestScreen> {
           style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
         ),
       ],
+    );
+  }
+
+  void _showCloseCycleDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFBE123C)),
+            SizedBox(width: 8),
+            Text('Tutup Buku Siklus', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+          ],
+        ),
+        content: const Text(
+          'Apakah Anda yakin ingin menutup buku siklus panen musim ini? Rekap akhir akan diarsipkan dan histori panen akan dikunci.',
+          style: TextStyle(fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFBE123C),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Buku siklus berhasil ditutup & diarsipkan!'),
+                  backgroundColor: Color(0xFFBE123C),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+            child: const Text('Ya, Tutup Buku', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
     );
   }
 }

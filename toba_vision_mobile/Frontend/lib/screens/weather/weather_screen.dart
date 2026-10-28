@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../data/services.dart';
+import '../../widgets/app_header.dart';
 import '../../widgets/async_view.dart';
 
 class WeatherScreen extends StatelessWidget {
@@ -34,6 +35,27 @@ class WeatherScreen extends StatelessWidget {
         final ok = w.safeToDry;
         final main = ok ? AppColors.forest : AppColors.red;
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          AppHeader(
+            subtitle: 'TEMANGGUNG, JATENG',
+            padding: EdgeInsets.zero,
+            height: null,
+            logoSize: 40,
+            logoIcon: Icons.wb_sunny_rounded,
+            logoBg: AppColors.peach,
+            logoColor: AppColors.amber,
+            trailing: AppHeaderActionButton(
+              icon: Icons.sync_rounded,
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Prakiraan cuaca kebun berhasil diperbarui!'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
           Text('${greeting()}, ${p.name}',
               style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.forest)),
           const SizedBox(height: 16),

@@ -98,11 +98,19 @@ class _FinanceScreenState extends State<FinanceScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const AppHeader(
-                backgroundColor: Color(0xE6F4F7F5),
+              AppHeader(
+                backgroundColor: const Color(0xE6F4F7F5),
                 showBottomBorder: true,
                 trailing: AppHeaderActionButton(
-                  icon: Icons.person_outline_rounded,
+                  icon: Icons.sync_rounded,
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Sinkronisasi data keuangan berhasil diperbarui!'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
                 ),
               ),
               Padding(
@@ -587,7 +595,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
                         bg: const Color(0xFFFFF1F2),
                         fg: const Color(0xFFBE123C),
                         border: const Color(0xFFFFE4E6),
-                        onTap: () {},
+                        onTap: () => _confirmDeleteItem(index, item),
                       ),
                     ],
                   ),
@@ -597,6 +605,90 @@ class _FinanceScreenState extends State<FinanceScreen> {
           },
         ),
       ],
+    );
+  }
+
+  void _confirmDeleteItem(int index, Map<String, dynamic> item) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_outline_rounded, color: Color(0xFFBE123C)),
+            SizedBox(width: 8),
+            Text(
+              'Hapus Pengeluaran',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Apakah Anda yakin ingin menghapus catatan "${item['title']}" sebesar ${item['amount']}?',
+              style: const TextStyle(fontSize: 13, height: 1.45, color: Color(0xFF475569)),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF1F2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, color: Color(0xFFBE123C), size: 16),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Tindakan ini tidak dapat dibatalkan.',
+                      style: TextStyle(fontSize: 11, color: Color(0xFFBE123C), fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text(
+              'Batal',
+              style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFBE123C),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              final deletedTitle = item['title'];
+              setState(() {
+                _historyItems.removeAt(index);
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Catatan "$deletedTitle" berhasil dihapus!'),
+                  backgroundColor: const Color(0xFFBE123C),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+            child: const Text('Ya, Hapus', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
     );
   }
 

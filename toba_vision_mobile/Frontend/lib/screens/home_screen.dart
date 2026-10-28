@@ -24,6 +24,9 @@ class HomeScreen extends StatelessWidget {
             logoBg: AppColors.forest,
             logoColor: Colors.white,
             logoIcon: Icons.spa_outlined,
+            trailing: AppHeaderActionButton(
+              icon: Icons.person_outline_rounded,
+            ),
           ),
           const SizedBox(height: 16),
           Text(
