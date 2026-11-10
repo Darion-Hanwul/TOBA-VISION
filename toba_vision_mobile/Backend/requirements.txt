@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+firebase-admin
+ultralytics
+pillow
+python-multipart
+cloudinary
+python-dotenv
+requests
+httpx

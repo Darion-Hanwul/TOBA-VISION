@@ -1,1 +1,12 @@
 Materi Dosen & Praktikum/
+*.env
+.env
+firebase_key.json
+toba_vision_mobile/Backend/firebase_key.json
+toba_vision_mobile/Backend/.env
+
+.vscode/settings.json
+
+__pycache__/
+*.pyc
+toba_vision_mobile/Backend/__pycache__/
