@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 import '../../widgets/app_header.dart';
+import 'harvest_all_musim_screen.dart';
 import 'harvest_edit_screen.dart';
 
 class HarvestScreen extends StatefulWidget {
-  const HarvestScreen({super.key});
+  final bool showBack;
+  const HarvestScreen({super.key, this.showBack = false});
 
   @override
   State<HarvestScreen> createState() => _HarvestScreenState();
 }
 
 class _HarvestScreenState extends State<HarvestScreen> {
+  int _selectedPeriod = 0; // 0: Musim Ini, 1: Semua
+  final List<String> _periods = ['Musim Ini', 'Semua'];
+
   int _activeStep = 3; // Tahap Petikan ke-3 (P3) aktif
   final TextEditingController _weightController = TextEditingController(text: '850');
   final TextEditingController _revenueController = TextEditingController(text: '68.600.000');
@@ -46,6 +51,7 @@ class _HarvestScreenState extends State<HarvestScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               AppHeader(
+                showBack: widget.showBack,
                 backgroundColor: const Color(0xFFF7F9FB),
                 logoIcon: Icons.agriculture_rounded,
                 logoBg: const Color(0xFFA7F3D0),
@@ -68,6 +74,8 @@ class _HarvestScreenState extends State<HarvestScreen> {
                   children: [
                     const SizedBox(height: 4),
                     _buildTitleSection(),
+                    const SizedBox(height: 12),
+                    _buildPeriodSelector(),
                     const SizedBox(height: 16),
                     _buildStepTrackerCard(),
                     const SizedBox(height: 16),
@@ -130,6 +138,92 @@ class _HarvestScreenState extends State<HarvestScreen> {
             fontSize: 12,
             height: 1.5,
             color: Color(0xFF475569),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Filter Periode Musim (Chips: "Musim Ini" & "Semua")
+  Widget _buildPeriodSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'PILIH PERIODE',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
+            color: Color(0xFF64748B),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: List.generate(_periods.length, (index) {
+              final isSelected = _selectedPeriod == index;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: GestureDetector(
+                  onTap: () {
+                    if (index == 1) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const HarvestAllMusimScreen(),
+                        ),
+                      ).then((_) {
+                        if (mounted) {
+                          setState(() => _selectedPeriod = 0);
+                        }
+                      });
+                    } else {
+                      setState(() => _selectedPeriod = index);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isSelected ? const Color(0xFF064E3B) : Colors.white,
+                      borderRadius: BorderRadius.circular(9999),
+                      border: Border.all(
+                        color: isSelected
+                            ? const Color(0xFF064E3B)
+                            : const Color(0xFFE2E8F0),
+                      ),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFF064E3B).withValues(alpha: 0.2),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              )
+                            ]
+                          : null,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isSelected) ...[
+                          const Icon(Icons.check_rounded, color: Colors.white, size: 14),
+                          const SizedBox(width: 6),
+                        ],
+                        Text(
+                          _periods[index],
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                            color: isSelected ? Colors.white : const Color(0xFF475569),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
           ),
         ),
       ],
@@ -852,7 +946,7 @@ class _HarvestScreenState extends State<HarvestScreen> {
             onPressed: _showCloseCycleDialog,
             icon: const Icon(Icons.lock_clock_outlined, size: 20),
             label: const Text(
-              'Tutup Buku Siklus Padi',
+              'Tutup Buku Siklus Panen',
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
             ),
           ),

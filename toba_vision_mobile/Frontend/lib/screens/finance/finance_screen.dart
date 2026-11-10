@@ -6,7 +6,8 @@ import 'finance_end_screen.dart';
 import 'finance_screen_edit_upload.dart';
 
 class FinanceScreen extends StatefulWidget {
-  const FinanceScreen({super.key});
+  final bool showBack;
+  const FinanceScreen({super.key, this.showBack = false});
 
   @override
   State<FinanceScreen> createState() => _FinanceScreenState();
@@ -100,6 +101,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               AppHeader(
+                showBack: widget.showBack,
                 backgroundColor: const Color(0xE6F4F7F5),
                 showBottomBorder: true,
                 trailing: AppHeaderActionButton(
@@ -179,7 +181,11 @@ class _FinanceScreenState extends State<FinanceScreen> {
                         MaterialPageRoute(
                           builder: (context) => const FinanceAllMusimScreen(),
                         ),
-                      );
+                      ).then((_) {
+                        if (mounted) {
+                          setState(() => _selectedPeriod = 0);
+                        }
+                      });
                     } else {
                       setState(() => _selectedPeriod = index);
                     }

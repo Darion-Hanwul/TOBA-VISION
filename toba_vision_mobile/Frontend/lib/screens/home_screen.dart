@@ -22,9 +22,7 @@ class HomeScreen extends StatelessWidget {
             padding: EdgeInsets.zero,
             height: null,
             logoSize: 44,
-            logoBg: AppColors.forest,
-            logoColor: Colors.white,
-            logoIcon: Icons.spa_outlined,
+            useAppLogo: true,
             trailing: AppHeaderActionButton(
               icon: Icons.person_outline_rounded,
               onTap: () => _showProfileModal(context, p),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
+import '../widgets/app_logo.dart';
 import 'register_screen.dart';
 import 'shell.dart';
 
@@ -80,26 +81,15 @@ class _LoginScreenState extends State<LoginScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // High Contrast Tactile App Icon
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: const Color(0xFF004C22),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF004C22).withValues(alpha: 0.25),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Center(
-              child: CustomPaint(
-                size: const Size(40, 40),
-                painter: _TobaccoLeafPainter(),
+          TobaVisionLogo(
+            size: 64,
+            elevation: [
+              BoxShadow(
+                color: const Color(0xFF29543C).withValues(alpha: 0.25),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
               ),
-            ),
+            ],
           ),
           const SizedBox(width: 14),
 
@@ -342,85 +332,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-}
-
-/// Custom painter for tobacco leaf icon with tactile green vector look
-class _TobaccoLeafPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final leafPaint = Paint()
-      ..color = const Color(0xFFA6F4B7)
-      ..style = PaintingStyle.fill;
-
-    final veinPaint = Paint()
-      ..color = const Color(0xFF004C22)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
-      ..strokeCap = StrokeCap.round;
-
-    final accentPaint = Paint()
-      ..color = const Color(0xFFFD8A42)
-      ..style = PaintingStyle.fill;
-
-    final path = Path();
-    // Central tobacco leaf silhouette
-    path.moveTo(size.width * 0.5, size.height * 0.1);
-    path.cubicTo(
-      size.width * 0.85,
-      size.height * 0.25,
-      size.width * 0.9,
-      size.height * 0.7,
-      size.width * 0.5,
-      size.height * 0.9,
-    );
-    path.cubicTo(
-      size.width * 0.1,
-      size.height * 0.7,
-      size.width * 0.15,
-      size.height * 0.25,
-      size.width * 0.5,
-      size.height * 0.1,
-    );
-    path.close();
-    canvas.drawPath(path, leafPaint);
-
-    // Center vein
-    canvas.drawLine(
-      Offset(size.width * 0.5, size.height * 0.18),
-      Offset(size.width * 0.5, size.height * 0.85),
-      veinPaint,
-    );
-
-    // Side veins
-    canvas.drawLine(
-      Offset(size.width * 0.5, size.height * 0.4),
-      Offset(size.width * 0.72, size.height * 0.32),
-      veinPaint,
-    );
-    canvas.drawLine(
-      Offset(size.width * 0.5, size.height * 0.4),
-      Offset(size.width * 0.28, size.height * 0.32),
-      veinPaint,
-    );
-    canvas.drawLine(
-      Offset(size.width * 0.5, size.height * 0.55),
-      Offset(size.width * 0.72, size.height * 0.48),
-      veinPaint,
-    );
-    canvas.drawLine(
-      Offset(size.width * 0.5, size.height * 0.55),
-      Offset(size.width * 0.28, size.height * 0.48),
-      veinPaint,
-    );
-
-    // Accent dot (peach/orange) representing Sindoro sunrise / maturity
-    canvas.drawCircle(
-      Offset(size.width * 0.75, size.height * 0.22),
-      3.5,
-      accentPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

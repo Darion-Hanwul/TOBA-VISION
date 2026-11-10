@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../widgets/app_header.dart';
+import 'finance_screen.dart';
 
 class FinanceAllMusimScreen extends StatefulWidget {
   const FinanceAllMusimScreen({super.key});
@@ -521,6 +522,24 @@ class _FinanceAllMusimScreenState extends State<FinanceAllMusimScreen> {
                         fg: const Color(0xFF1E293B),
                         border: const Color(0xFFE2E8F0),
                         onTap: () => _showSeasonDetail(season),
+                      ),
+                      const SizedBox(width: 8),
+                      _buildMiniButton(
+                        label: 'Edit',
+                        icon: Icons.edit_outlined,
+                        bg: const Color(0xFFF0FDF4),
+                        fg: const Color(0xFF166534),
+                        border: const Color(0xFFBBF7D0),
+                        onTap: () {
+                          if (Navigator.canPop(context)) {
+                            Navigator.pop(context);
+                          } else {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(builder: (context) => const FinanceScreen()),
+                            );
+                          }
+                        },
                       ),
                       const SizedBox(width: 8),
                       _buildMiniButton(

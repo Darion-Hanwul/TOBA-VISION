@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
+import 'app_logo.dart';
 
 /// Reusable Top Header / App Bar untuk aplikasi TOBA VISION.
 ///
@@ -25,6 +26,9 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
 
   /// Widget logo custom di sebelah kiri (menggantikan logo default).
   final Widget? leading;
+
+  /// Menggunakan logo vektor resmi TobaVisionLogo alih-alih icon. Default: false.
+  final bool useAppLogo;
 
   /// Icon untuk logo brand default jika [leading] tidak diset. Default: Icons.spa_rounded.
   final IconData logoIcon;
@@ -60,6 +64,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
     this.showBack = false,
     this.onBack,
     this.leading,
+    this.useAppLogo = false,
     this.logoIcon = Icons.spa_rounded,
     this.logoBg,
     this.logoColor,
@@ -114,6 +119,17 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           leading!,
+          const SizedBox(width: 10),
+          _buildTitleText(),
+        ],
+      );
+    }
+
+    if (useAppLogo) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TobaVisionLogo(size: logoSize),
           const SizedBox(width: 10),
           _buildTitleText(),
         ],
