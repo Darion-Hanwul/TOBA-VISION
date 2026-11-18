@@ -1,13 +1,26 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../core/theme.dart';
 import '../../widgets/app_header.dart';
+import '../../widgets/retro/blade_ornament.dart';
+import '../../widgets/retro/micro_text.dart';
+import '../../widgets/retro/retro_card.dart';
+import '../../widgets/retro/retro_frame.dart';
+import '../../widgets/retro/status_chip.dart';
+import '../../widgets/retro/trapezoid_tab_button.dart';
+import '../../widgets/retro/vu_meter_bar.dart';
 import 'finance_all_musim_screen.dart';
-import 'finance_end_screen.dart';
 import 'finance_screen_edit_upload.dart';
+
+class FinanceDataStore {
+  static String activeSeasonTitle = 'Biaya & Pengeluaran Musim 3';
+  static String activeTotalExpense = 'Rp 14.250.000';
+  static Map<String, dynamic>? activeSeasonData;
+}
 
 class FinanceScreen extends StatefulWidget {
   final bool showBack;
-  const FinanceScreen({super.key, this.showBack = false});
+  final Map<String, dynamic>? initialSeasonData;
+  const FinanceScreen({super.key, this.showBack = false, this.initialSeasonData});
 
   @override
   State<FinanceScreen> createState() => _FinanceScreenState();
@@ -15,887 +28,794 @@ class FinanceScreen extends StatefulWidget {
 
 class _FinanceScreenState extends State<FinanceScreen> {
   int _selectedPeriod = 0; // 0: Musim Ini, 1: Semua
-
   final List<String> _periods = ['Musim Ini', 'Semua'];
 
-  // Data Kategori
-  final List<Map<String, dynamic>> _categories = [
-    {
-      'name': 'Buruh Tani / Upah',
-      'amount': 'Rp 6,8 jt',
-      'percentage': '48%',
-      'icon': Icons.groups_rounded,
-      'color': const Color(0xFF065F46),
-      'bg': const Color(0xFFD1FAE5),
-    },
-    {
-      'name': 'Pupuk & Nutrisi',
-      'amount': 'Rp 3,8 jt',
-      'percentage': '27%',
-      'icon': Icons.science_outlined,
-      'color': const Color(0xFF4338CA),
-      'bg': const Color(0xFFE0E7FF),
-    },
-    {
-      'name': 'Bibit & Olah Lahan',
-      'amount': 'Rp 2,4 jt',
-      'percentage': '17%',
-      'icon': Icons.spa_outlined,
-      'color': const Color(0xFF115E59),
-      'bg': const Color(0xFFCCFBF1),
-    },
-    {
-      'name': 'Lainnya / Tambahan',
-      'amount': 'Rp 1,25 jt',
-      'percentage': '8%',
-      'icon': Icons.category_outlined,
-      'color': const Color(0xFF92400E),
-      'bg': const Color(0xFFFEF3C7),
-    },
-  ];
+  String _currentSeasonTitle = FinanceDataStore.activeSeasonTitle;
+  String _currentTotalExpense = FinanceDataStore.activeTotalExpense;
+  late List<Map<String, dynamic>> _categories;
 
-  // Data Riwayat Pengeluaran
+  @override
+  void initState() {
+    super.initState();
+    _initCategories();
+    if (widget.initialSeasonData != null) {
+      _applySeasonData(widget.initialSeasonData!);
+    } else if (FinanceDataStore.activeSeasonData != null) {
+      _applySeasonData(FinanceDataStore.activeSeasonData!);
+    }
+  }
+
+  void _initCategories() {
+    _categories = [
+      {
+        'name': 'Buruh Tani / Upah',
+        'amount': 'Rp 6,8 jt',
+        'ratio': 0.48,
+        'percentage': '48%',
+        'icon': Icons.groups_rounded,
+        'color': AppColors.forest,
+      },
+      {
+        'name': 'Pupuk & Nutrisi',
+        'amount': 'Rp 3,8 jt',
+        'ratio': 0.27,
+        'percentage': '27%',
+        'icon': Icons.science_outlined,
+        'color': AppColors.limeDeep,
+      },
+      {
+        'name': 'Bibit & Olah Lahan',
+        'amount': 'Rp 2,4 jt',
+        'ratio': 0.17,
+        'percentage': '17%',
+        'icon': Icons.spa_outlined,
+        'color': AppColors.orange,
+      },
+      {
+        'name': 'Lainnya / Tambahan',
+        'amount': 'Rp 1,25 jt',
+        'ratio': 0.08,
+        'percentage': '8%',
+        'icon': Icons.category_outlined,
+        'color': AppColors.ink,
+      },
+    ];
+  }
+
+  double _parseRupiah(String val) {
+    final clean = val.replaceAll(RegExp(r'[^0-9]'), '');
+    return double.tryParse(clean) ?? 0.0;
+  }
+
+  void _applySeasonData(Map<String, dynamic> season) {
+    final seasonNum = season['seasonNumber'] as int?;
+    final rawTitle = season['title'] as String? ?? '';
+    final lowerTitle = rawTitle.toLowerCase();
+
+    if (seasonNum == 3 || lowerTitle.contains('ketiga') || lowerTitle.contains('musim 3')) {
+      _currentSeasonTitle = 'Biaya & Pengeluaran Musim 3';
+    } else if (seasonNum == 2 || lowerTitle.contains('kedua') || lowerTitle.contains('musim 2')) {
+      _currentSeasonTitle = 'Biaya & Pengeluaran Musim 2';
+    } else if (seasonNum == 1 || lowerTitle.contains('pertama') || lowerTitle.contains('kesatu') || lowerTitle.contains('musim 1')) {
+      _currentSeasonTitle = 'Biaya & Pengeluaran Musim 1';
+    } else if (rawTitle.isNotEmpty) {
+      if (lowerTitle.startsWith('biaya & pengeluaran')) {
+        _currentSeasonTitle = rawTitle;
+      } else {
+        _currentSeasonTitle = 'Biaya & Pengeluaran $rawTitle';
+      }
+    }
+
+    if (season['expenses'] != null) {
+      _currentTotalExpense = season['expenses'] as String;
+    }
+
+    if (season['labor'] != null) {
+      _categories[0]['amount'] = season['labor'] as String;
+    }
+    if (season['fertilizer'] != null) {
+      _categories[1]['amount'] = season['fertilizer'] as String;
+    }
+    if (season['seed'] != null) {
+      _categories[2]['amount'] = season['seed'] as String;
+    }
+    if (season['other'] != null) {
+      _categories[3]['amount'] = season['other'] as String;
+    }
+
+    final totalVal = _parseRupiah(_currentTotalExpense);
+    if (totalVal > 0) {
+      for (final cat in _categories) {
+        final catVal = _parseRupiah(cat['amount'] as String);
+        if (catVal > 0) {
+          final ratio = (catVal / totalVal).clamp(0.0, 1.0);
+          cat['ratio'] = ratio;
+          cat['percentage'] = '${(ratio * 100).round()}%';
+        }
+      }
+    }
+
+    FinanceDataStore.activeSeasonData = season;
+    FinanceDataStore.activeSeasonTitle = _currentSeasonTitle;
+    FinanceDataStore.activeTotalExpense = _currentTotalExpense;
+
+    _updateHistoryForSeason(season);
+  }
+
+  void _updateHistoryForSeason(Map<String, dynamic> season) {
+    final seasonNum = season['seasonNumber'] as int?;
+    final rawTitle = season['title'] as String? ?? '';
+    final lower = rawTitle.toLowerCase();
+
+    if (seasonNum == 2 || lower.contains('kedua') || lower.contains('musim 2')) {
+      _historyItems
+        ..clear()
+        ..addAll([
+          {
+            'title': 'Upah Petik Daun Bawah',
+            'date': '12 Sep 2023 • 8 Pekerja',
+            'amount': '-Rp 1.100.000',
+            'icon': Icons.groups_rounded,
+          },
+          {
+            'title': 'Pupuk ZA & NPK Daun',
+            'date': '18 Agu 2023 • Toko Tani Maju',
+            'amount': '-Rp 780.000',
+            'icon': Icons.science_outlined,
+          },
+          {
+            'title': 'Sewa Traktor Lahan Blok A',
+            'date': '02 Jul 2023 • Olah Tanah',
+            'amount': '-Rp 550.000',
+            'icon': Icons.agriculture_rounded,
+          },
+          {
+            'title': 'Bibit Unggul Temanggung',
+            'date': '20 Mei 2023 • 4500 Batang',
+            'amount': '-Rp 1.350.000',
+            'icon': Icons.spa_outlined,
+          },
+        ]);
+    } else if (seasonNum == 1 || lower.contains('pertama') || lower.contains('kesatu') || lower.contains('musim 1')) {
+      _historyItems
+        ..clear()
+        ..addAll([
+          {
+            'title': 'Upah Petik Daun Bawah',
+            'date': '15 Sep 2022 • 7 Pekerja',
+            'amount': '-Rp 950.000',
+            'icon': Icons.groups_rounded,
+          },
+          {
+            'title': 'Pupuk ZA & NPK Daun',
+            'date': '22 Jul 2022 • Toko Tani Maju',
+            'amount': '-Rp 700.000',
+            'icon': Icons.science_outlined,
+          },
+          {
+            'title': 'Sewa Traktor Lahan Blok A',
+            'date': '10 Jun 2022 • Olah Tanah',
+            'amount': '-Rp 500.000',
+            'icon': Icons.agriculture_rounded,
+          },
+          {
+            'title': 'Bibit Unggul Temanggung',
+            'date': '05 Jun 2022 • 4000 Batang',
+            'amount': '-Rp 1.200.000',
+            'icon': Icons.spa_outlined,
+          },
+        ]);
+    } else {
+      _historyItems
+        ..clear()
+        ..addAll([
+          {
+            'title': 'Upah Petik Daun Bawah',
+            'date': '12 Okt 2024 • 8 Pekerja',
+            'amount': '-Rp 1.200.000',
+            'icon': Icons.groups_rounded,
+          },
+          {
+            'title': 'Pupuk ZA & NPK Daun',
+            'date': '08 Okt 2024 • Toko Tani Maju',
+            'amount': '-Rp 850.000',
+            'icon': Icons.science_outlined,
+          },
+          {
+            'title': 'Sewa Traktor Lahan Blok A',
+            'date': '24 Sep 2024 • Olah Tanah',
+            'amount': '-Rp 600.000',
+            'icon': Icons.agriculture_rounded,
+          },
+          {
+            'title': 'Bibit Unggul Temanggung',
+            'date': '18 Sep 2024 • 5000 Batang',
+            'amount': '-Rp 1.500.000',
+            'icon': Icons.spa_outlined,
+          },
+        ]);
+    }
+  }
+
+  Future<void> _navigateToSelectSeason() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const FinanceAllMusimScreen(),
+      ),
+    );
+    if (mounted) {
+      setState(() => _selectedPeriod = 0);
+      if (result != null && result is Map<String, dynamic>) {
+        setState(() {
+          _applySeasonData(result);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Beralih ke: $_currentSeasonTitle'),
+            backgroundColor: AppColors.ink,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showSeasonSelectionSheet() {
+    final seasons = [
+      {
+        'seasonNumber': 3,
+        'title': 'Musim Ketiga (2024)',
+        'short': 'Musim 3',
+        'period': 'Mei - Okt 2024 • Lahan Blok A & B',
+        'expenses': 'Rp 14.250.000',
+        'harvest': '3.200 kg tembakau',
+        'status': 'Selesai',
+        'labor': 'Rp 6.840.000',
+        'fertilizer': 'Rp 3.847.500',
+        'seed': 'Rp 2.422.500',
+        'other': 'Rp 1.140.000',
+      },
+      {
+        'seasonNumber': 2,
+        'title': 'Musim Kedua (2023)',
+        'short': 'Musim 2',
+        'period': 'Mei - Sep 2023 • Lahan Blok A',
+        'expenses': 'Rp 12.800.000',
+        'harvest': '2.850 kg tembakau',
+        'status': 'Selesai',
+        'labor': 'Rp 6.144.000',
+        'fertilizer': 'Rp 3.456.000',
+        'seed': 'Rp 2.176.000',
+        'other': 'Rp 1.024.000',
+      },
+      {
+        'seasonNumber': 1,
+        'title': 'Musim Pertama (2022)',
+        'short': 'Musim 1',
+        'period': 'Jun - Okt 2022 • Lahan Blok A',
+        'expenses': 'Rp 11.450.000',
+        'harvest': '2.600 kg tembakau',
+        'status': 'Selesai',
+        'labor': 'Rp 5.496.000',
+        'fertilizer': 'Rp 3.091.500',
+        'seed': 'Rp 1.946.500',
+        'other': 'Rp 916.000',
+      },
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(18),
+        decoration: const BoxDecoration(
+          color: AppColors.paper,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          border: Border(
+            top: BorderSide(color: AppColors.ink, width: 2),
+            left: BorderSide(color: AppColors.ink, width: 2),
+            right: BorderSide(color: AppColors.ink, width: 2),
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('PILIH PERIODE MUSIM', style: AppTypography.display(fontSize: 16, fontWeight: FontWeight.w900)),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(ctx),
+                    child: const Icon(Icons.close_rounded, size: 20, color: AppColors.ink),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const MicroText('PILIH MUSIM UNTUK MENAMPILKAN BUKU KAS AKTIF', fontSize: 9, color: AppColors.muted),
+              const SizedBox(height: 14),
+              ...seasons.map((s) {
+                final isCurrent = _currentSeasonTitle.contains(s['short'] as String);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      setState(() {
+                        _applySeasonData(s);
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Beralih ke: $_currentSeasonTitle'),
+                          backgroundColor: AppColors.ink,
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isCurrent ? AppColors.mint : Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isCurrent ? AppColors.limeDeep : AppColors.ink,
+                          width: isCurrent ? 2 : 1.5,
+                        ),
+                        boxShadow: const [BoxShadow(color: AppColors.ink, offset: Offset(2, 2))],
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  s['title'] as String,
+                                  style: AppTypography.display(fontSize: 14, fontWeight: FontWeight.w800),
+                                ),
+                                const SizedBox(height: 2),
+                                MicroText(s['period'] as String, fontSize: 9.5, color: AppColors.muted),
+                              ],
+                            ),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                s['expenses'] as String,
+                                style: AppTypography.mono(fontSize: 12, fontWeight: FontWeight.w900),
+                              ),
+                              const SizedBox(height: 2),
+                              if (isCurrent)
+                                const StatusChip(label: 'AKTIF', variant: StatusChipVariant.lime)
+                              else
+                                const MicroText('PILIH', fontSize: 9, color: AppColors.muted),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+              const SizedBox(height: 10),
+              TrapezoidTabButton(
+                label: 'SEMUA ARSIP MUSIM',
+                icon: Icons.folder_open_outlined,
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _navigateToSelectSeason();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   final List<Map<String, dynamic>> _historyItems = [
     {
       'title': 'Upah Petik Daun Bawah',
       'date': '12 Okt 2026 • 8 Pekerja',
       'amount': '-Rp 1.200.000',
       'icon': Icons.groups_rounded,
-      'color': const Color(0xFF065F46),
-      'bg': const Color(0xFFD1FAE5),
     },
     {
       'title': 'Pupuk ZA & NPK Daun',
       'date': '08 Okt 2026 • Toko Tani Maju',
       'amount': '-Rp 850.000',
       'icon': Icons.science_outlined,
-      'color': const Color(0xFF4338CA),
-      'bg': const Color(0xFFE0E7FF),
     },
     {
-      'title': 'Sewa Traktor Olah Tanah',
-      'date': '28 Sep 2026 • Lahan Blok A',
+      'title': 'Sewa Traktor Lahan Blok A',
+      'date': '24 Sep 2026 • Olah Tanah',
       'amount': '-Rp 600.000',
       'icon': Icons.agriculture_rounded,
-      'color': const Color(0xFF115E59),
-      'bg': const Color(0xFFCCFBF1),
     },
     {
-      'title': 'Beli Tali Bambu & Waring',
-      'date': '20 Sep 2026 • Perlengkapan',
-      'amount': '-Rp 350.000',
-      'icon': Icons.inventory_2_outlined,
-      'color': const Color(0xFF92400E),
-      'bg': const Color(0xFFFEF3C7),
+      'title': 'Bibit Unggul Temanggung',
+      'date': '18 Sep 2026 • 5000 Batang',
+      'amount': '-Rp 1.500.000',
+      'icon': Icons.spa_outlined,
     },
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7F5),
+      backgroundColor: const Color(0xFFF0EFE9),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AppHeader(
-                showBack: widget.showBack,
-                backgroundColor: const Color(0xE6F4F7F5),
-                showBottomBorder: true,
-                trailing: AppHeaderActionButton(
-                  icon: Icons.sync_rounded,
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Sinkronisasi data keuangan berhasil diperbarui!'),
-                        duration: Duration(seconds: 2),
+        child: RetroFrame(
+          backgroundColor: AppColors.sage,
+          margin: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. Header dengan Sync Action
+                AppHeader(
+                  showBack: widget.showBack,
+                  title: 'BUKU KAS BIAYA',
+                  subtitle: 'KEUANGAN TANI // TEMANGGUNG',
+                  padding: EdgeInsets.zero,
+                  height: null,
+                  logoSize: 40,
+                  logoIcon: Icons.account_balance_wallet_rounded,
+                  trailing: AppHeaderActionButton(
+                    icon: Icons.sync_rounded,
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Data kas operasional berhasil diperbarui!'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Judul & Deskripsi dengan Fitur Edit / Ganti Musim
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _currentSeasonTitle,
+                            style: AppTypography.display(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.ink,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Catat dan pantau seluruh modal pengeluaran musim tanam aktif.',
+                            style: AppTypography.body(fontSize: 12, color: AppColors.muted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: _showSeasonSelectionSheet,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.paper,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppColors.ink, width: 1.5),
+                          boxShadow: const [
+                            BoxShadow(color: AppColors.ink, offset: Offset(2, 2)),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.edit_outlined, size: 14, color: AppColors.ink),
+                            const SizedBox(width: 4),
+                            MicroText('EDIT', fontSize: 10, color: AppColors.ink, fontWeight: FontWeight.w900),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // 2. Chip Filter Periode Musim
+                _buildPeriodSelector(),
+                const SizedBox(height: 14),
+
+                // 3. Kartu Total Biaya dengan RingProgress Donut Chart
+                _buildTotalExpenseCard(),
+                const SizedBox(height: 16),
+
+                // 4. Rincian 4 Pos Biaya Operasional (VuMeterBar)
+                _buildCategoryBreakdown(),
+                const SizedBox(height: 16),
+
+                // 5. Riwayat Pengeluaran (Gaya Struk/Tiket)
+                _buildHistorySection(),
+                const SizedBox(height: 20),
+
+                // 6. Tombol Tambah Catatan Biaya (Trapezoid CTA)
+                TrapezoidTabButton(
+                  label: 'TAMBAH CATATAN BIAYA',
+                  icon: Icons.add_rounded,
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const FinanceScreenEditUpload(),
                       ),
                     );
                   },
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildPageTitleSection(),
-                    const SizedBox(height: 16),
-                    _buildCircularSummaryCard(),
-                    const SizedBox(height: 20),
-                    _buildExpenseCategoryGrid(),
-                    const SizedBox(height: 20),
-                    _buildPrimaryActionButton(),
-                    const SizedBox(height: 20),
-                    _buildExpenseHistoryList(),
-                    const SizedBox(height: 20),
-                    _buildArchiveReportCard(),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // 2. Title & Period Chips Filter
-  Widget _buildPageTitleSection() {
+  Widget _buildPeriodSelector() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Biaya & Pengeluaran Kebun',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.6,
-            color: Color(0xFF022C22),
-          ),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Kelola catatan pengeluaran operasional perkebunan dengan jelas dan tenang.',
-          style: TextStyle(
-            fontSize: 12,
-            height: 1.5,
-            color: Color(0xFF64748B),
-          ),
-        ),
-        const SizedBox(height: 12),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: List.generate(_periods.length, (index) {
-              final isSelected = _selectedPeriod == index;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: GestureDetector(
-                  onTap: () {
-                    if (index == 1) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const FinanceAllMusimScreen(),
-                        ),
-                      ).then((_) {
-                        if (mounted) {
-                          setState(() => _selectedPeriod = 0);
-                        }
-                      });
-                    } else {
-                      setState(() => _selectedPeriod = index);
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFF064E3B) : Colors.white,
-                      borderRadius: BorderRadius.circular(9999),
-                      border: Border.all(
-                        color: isSelected
-                            ? const Color(0xFF064E3B)
-                            : const Color(0xFFE2E8F0),
-                      ),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: const Color(0xFF064E3B).withValues(alpha: 0.2),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              )
-                            ]
-                          : null,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (isSelected) ...[
-                          const Icon(Icons.check_rounded, color: Colors.white, size: 14),
-                          const SizedBox(width: 6),
-                        ],
-                        Text(
-                          _periods[index],
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                            color: isSelected ? Colors.white : const Color(0xFF475569),
-                          ),
-                        ),
+        const MicroText('PILIH PERIODE // FILTER', fontSize: 9.5),
+        const SizedBox(height: 8),
+        Row(
+          children: List.generate(_periods.length, (index) {
+            final isSelected = _selectedPeriod == index;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: GestureDetector(
+                onTap: () {
+                  if (index == 1) {
+                    _navigateToSelectSeason();
+                  } else {
+                    setState(() => _selectedPeriod = index);
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.ink : AppColors.paper,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppColors.ink, width: 1.5),
+                    boxShadow: isSelected
+                        ? const [
+                            BoxShadow(color: AppColors.lime, offset: Offset(2, 2)),
+                          ]
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isSelected) ...[
+                        const Icon(Icons.check_rounded, color: AppColors.lime, size: 14),
+                        const SizedBox(width: 4),
                       ],
-                    ),
+                      MicroText(
+                        _periods[index],
+                        fontSize: 10,
+                        color: isSelected ? AppColors.paper : AppColors.ink,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ],
                   ),
                 ),
-              );
-            }),
-          ),
+              ),
+            );
+          }),
         ),
       ],
     );
   }
 
-  // 3. Circular Summary Card (Gauge Progress & Total Biaya)
-  Widget _buildCircularSummaryCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0x0D022C22)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0A000000),
-            blurRadius: 4,
-            offset: Offset(0, 2),
+  Widget _buildTotalExpenseCard() {
+    return RetroCard(
+      tapeTag: 'TOTAL BIAYA // ESTIMASI MUSIM TANAM',
+      rightTag: '4 POS BIAYA',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const MicroText('TOTAL PENGELUARAN TERCATAT', fontSize: 9, color: AppColors.muted),
+          const SizedBox(height: 4),
+          Text(
+            _currentTotalExpense,
+            style: AppTypography.display(
+              fontSize: 26,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -1,
+              color: AppColors.ink,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Tercatat dari 4 kategori pengeluaran operasional.',
+            style: AppTypography.body(fontSize: 11, color: AppColors.muted),
           ),
         ],
       ),
-      child: Column(
-        children: [
-          // Circular Progress Ring Simulation
-          SizedBox(
-            width: 150,
-            height: 150,
-            child: Stack(
-              alignment: Alignment.center,
+    );
+  }
+
+  Widget _buildCategoryBreakdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const TaperedDivider(centerLabel: 'RINCIAN 4 POS BIAYA'),
+        const SizedBox(height: 6),
+        ..._categories.map((cat) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: RetroCard(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(cat['icon'] as IconData, size: 16, color: AppColors.ink),
+                          const SizedBox(width: 6),
+                          Text(
+                            cat['name'] as String,
+                            style: AppTypography.display(fontSize: 13, fontWeight: FontWeight.w800),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        cat['amount'] as String,
+                        style: AppTypography.mono(fontSize: 12, fontWeight: FontWeight.w900),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  VuMeterBar(
+                    value: cat['ratio'] as double,
+                    height: 8,
+                    totalSegments: 16,
+                    label: 'ALOKASI',
+                    valueText: cat['percentage'] as String,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildHistorySection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const TaperedDivider(centerLabel: 'RIWAYAT PENGELUARAN TERBARU'),
+        const SizedBox(height: 6),
+        ..._historyItems.map((item) {
+          return RetroCard(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(10),
+            child: Row(
               children: [
-                CustomPaint(
-                  size: const Size(150, 150),
-                  painter: _RingProgressPainter(),
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: AppColors.ink,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(item['icon'] as IconData, color: AppColors.lime, size: 18),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item['title'] as String,
+                        style: AppTypography.display(fontSize: 13, fontWeight: FontWeight.w800),
+                      ),
+                      Text(
+                        item['date'] as String,
+                        style: AppTypography.mono(fontSize: 9.5, color: AppColors.muted),
+                      ),
+                    ],
+                  ),
                 ),
                 Column(
-                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFECFDF5),
-                        shape: BoxShape.circle,
+                    Text(
+                      item['amount'] as String,
+                      style: AppTypography.mono(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.red,
                       ),
-                      child: const Icon(Icons.account_balance_wallet_rounded,
-                          color: Color(0xFF065F46), size: 16),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      'TOTAL BIAYA',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5,
-                        color: Color(0xFF64748B),
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => FinanceScreenEditUpload(
+                                  initialData: {
+                                    'title': item['title'],
+                                    'amount': item['amount'].toString().replaceAll('-Rp ', '').replaceAll('.', ''),
+                                  },
+                                ),
+                              ),
+                            );
+                          },
+                          child: const Icon(Icons.edit_outlined, size: 16, color: AppColors.ink),
+                        ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: () => _confirmDeleteExpense(item['title'] as String),
+                          child: const Icon(Icons.delete_outline_rounded, size: 16, color: AppColors.red),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Estimasi Musim Tanam',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF94A3B8),
-            ),
-          ),
-          const SizedBox(height: 2),
-          const Text(
-            'Rp 14.250.000',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.7,
-              color: Color(0xFF022C22),
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Tercatat dari 4 kategori pengeluaran operasional',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 11,
-              color: Color(0xFF94A3B8),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 4. Expense Category 2x2 Grid
-  Widget _buildExpenseCategoryGrid() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
-            Text(
-              'Rincian Biaya',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF0F172A),
-              ),
-            ),
-            Text(
-              '4 Pos Biaya',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF94A3B8),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 1.5,
-          ),
-          itemCount: _categories.length,
-          itemBuilder: (context, index) {
-            final cat = _categories[index];
-            return Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0x0D022C22)),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x0A000000), blurRadius: 2, offset: Offset(0, 1)),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          color: cat['bg'] as Color,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(cat['icon'] as IconData, color: cat['color'] as Color, size: 16),
-                      ),
-                      Text(
-                        cat['percentage'] as String,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF94A3B8),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        cat['name'] as String,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        cat['amount'] as String,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: cat['color'] as Color,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  // 5. Primary Action Button (Tambah Catatan Biaya)
-  Widget _buildPrimaryActionButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: ElevatedButton.icon(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF14532D),
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          elevation: 2,
-        ),
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const FinanceScreenEditUpload(),
-            ),
           );
-
-          if (result != null && mounted) {
-            setState(() {
-              _historyItems.insert(0, {
-                'title': result['title'] ?? 'Pengeluaran Baru',
-                'date': '${result['date']} • ${result['category']}',
-                'amount': result['amount'] ?? '-Rp 0',
-                'icon': Icons.receipt_long_rounded,
-                'color': const Color(0xFF065F46),
-                'bg': const Color(0xFFD1FAE5),
-              });
-            });
-          }
-        },
-        icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
-        label: const Text(
-          'Tambah Catatan Biaya',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-        ),
-      ),
-    );
-  }
-
-  // 6. Expense History List (Riwayat Catatan Pengeluaran)
-  Widget _buildExpenseHistoryList() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Riwayat Pengeluaran',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF0F172A),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFECFDF5),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Text(
-                'Terbaru',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF065F46),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _historyItems.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 10),
-          itemBuilder: (context, index) {
-            final item = _historyItems[index];
-            return Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0x0D022C22)),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x0A000000), blurRadius: 2, offset: Offset(0, 1)),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: item['bg'] as Color,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(item['icon'] as IconData, color: item['color'] as Color, size: 18),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item['title'] as String,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF1E293B),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              item['date'] as String,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF94A3B8),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        item['amount'] as String,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF064E3B),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  const Divider(height: 1, color: Color(0xFFF8FAFC)),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      _buildMiniButton(
-                        label: 'Edit',
-                        icon: Icons.edit_outlined,
-                        bg: const Color(0xFFF8FAFC),
-                        fg: const Color(0xFF334155),
-                        border: const Color(0xFFE2E8F0),
-                        onTap: () async {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => FinanceScreenEditUpload(
-                                initialData: item,
-                              ),
-                            ),
-                          );
-
-                          if (result != null && mounted) {
-                            setState(() {
-                              item['title'] = result['title'];
-                              item['amount'] = result['amount'];
-                            });
-                          }
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      _buildMiniButton(
-                        label: 'Hapus',
-                        icon: Icons.delete_outline_rounded,
-                        bg: const Color(0xFFFFF1F2),
-                        fg: const Color(0xFFBE123C),
-                        border: const Color(0xFFFFE4E6),
-                        onTap: () => _confirmDeleteItem(index, item),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
+        }),
       ],
     );
   }
 
-  void _confirmDeleteItem(int index, Map<String, dynamic> item) {
+  void _confirmDeleteExpense(String title) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.delete_outline_rounded, color: Color(0xFFBE123C)),
-            SizedBox(width: 8),
-            Text(
-              'Hapus Pengeluaran',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF1E293B),
-              ),
-            ),
-          ],
+        backgroundColor: AppColors.paper,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: const BorderSide(color: AppColors.ink, width: 2),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Apakah Anda yakin ingin menghapus catatan "${item['title']}" sebesar ${item['amount']}?',
-              style: const TextStyle(fontSize: 13, height: 1.45, color: Color(0xFF475569)),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF1F2),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.info_outline_rounded, color: Color(0xFFBE123C), size: 16),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Tindakan ini tidak dapat dibatalkan.',
-                      style: TextStyle(fontSize: 11, color: Color(0xFFBE123C), fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+        title: Text('HAPUS PENGELUARAN', style: AppTypography.display(fontSize: 15, fontWeight: FontWeight.w900)),
+        content: Text('Apakah Anda yakin ingin menghapus catatan "$title"? Tindakan ini tidak dapat dibatalkan.',
+            style: AppTypography.body(fontSize: 12)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text(
-              'Batal',
-              style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600),
-            ),
+            child: Text('BATAL', style: AppTypography.mono(fontSize: 11, color: AppColors.muted)),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFBE123C),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.red, foregroundColor: Colors.white),
             onPressed: () {
               Navigator.pop(ctx);
-              final deletedTitle = item['title'];
-              setState(() {
-                _historyItems.removeAt(index);
-              });
+              setState(() => _historyItems.removeWhere((i) => i['title'] == title));
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Catatan "$deletedTitle" berhasil dihapus!'),
-                  backgroundColor: const Color(0xFFBE123C),
-                  duration: const Duration(seconds: 2),
-                ),
+                SnackBar(content: Text('Catatan "$title" berhasil dihapus!')),
               );
             },
-            child: const Text('Ya, Hapus', style: TextStyle(fontWeight: FontWeight.w700)),
+            child: Text('YA, HAPUS', style: AppTypography.mono(fontSize: 11, fontWeight: FontWeight.w900)),
           ),
         ],
       ),
     );
   }
-
-  Widget _buildMiniButton({
-    required String label,
-    required IconData icon,
-    required Color bg,
-    required Color fg,
-    required Color border,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 13, color: fg),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // 7. Archive / Tutup Buku Section Card
-  Widget _buildArchiveReportCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFFE4E6)),
-        boxShadow: const [
-          BoxShadow(color: Color(0x0A000000), blurRadius: 2, offset: Offset(0, 1)),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF1F2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.archive_outlined, color: Color(0xFFBE123C), size: 18),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Tutup Buku Musim',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1E293B),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF1F2),
-                            borderRadius: BorderRadius.circular(9999),
-                            border: Border.all(color: const Color(0xFFFFE4E6)),
-                          ),
-                          child: const Text(
-                            'Akhir Musim',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFFBE123C),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Tutup buku pengeluaran dan simpan rekap akhir musim ini ke arsip laporan perkebunan.',
-                      style: TextStyle(
-                        fontSize: 11,
-                        height: 1.5,
-                        color: Color(0xFF94A3B8),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            height: 38,
-            child: OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFF1F2),
-                foregroundColor: const Color(0xFFBE123C),
-                side: const BorderSide(color: Color(0xFFFFE4E6)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const FinanceEndScreen(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.lock_outline_rounded, size: 16),
-              label: const Text(
-                'Tutup Buku & Simpan Rekap',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// Custom Painter untuk Circular Gauge Ring Progress
-class _RingProgressPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - 24) / 2;
-    const strokeWidth = 11.0;
-
-    final bgPaint = Paint()
-      ..color = const Color(0xFFE2E8F0)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    final greenPaint = Paint()
-      ..color = const Color(0xFF047857)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    final indigoPaint = Paint()
-      ..color = const Color(0xFF818CF8)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    // Background Full Circle
-    canvas.drawCircle(center, radius, bgPaint);
-
-    // Green Arc (Segmen Buruh Tani ~48%)
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -math.pi / 2,
-      math.pi * 1.0,
-      false,
-      greenPaint,
-    );
-
-    // Indigo Arc (Segmen Pupuk & Nutrisi ~27%)
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      math.pi / 2,
-      math.pi * 0.55,
-      false,
-      indigoPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

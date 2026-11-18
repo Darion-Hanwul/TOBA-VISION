@@ -1,6 +1,12 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../core/theme.dart';
 import '../../widgets/app_header.dart';
+import '../../widgets/retro/blade_ornament.dart';
+import '../../widgets/retro/micro_text.dart';
+import '../../widgets/retro/retro_card.dart';
+import '../../widgets/retro/retro_frame.dart';
+import '../../widgets/retro/status_chip.dart';
+import '../../widgets/retro/trapezoid_tab_button.dart';
 import 'finance_screen.dart';
 
 class FinanceAllMusimScreen extends StatefulWidget {
@@ -11,552 +17,362 @@ class FinanceAllMusimScreen extends StatefulWidget {
 }
 
 class _FinanceAllMusimScreenState extends State<FinanceAllMusimScreen> {
-  // Data Riwayat Semua Musim Tanam
   final List<Map<String, dynamic>> _seasonHistory = [
     {
+      'seasonNumber': 3,
       'title': 'Musim Ketiga (2024)',
       'period': 'Mei - Okt 2024 • Lahan Blok A & B',
       'expenses': 'Rp 14.250.000',
       'harvest': '3.200 kg tembakau',
       'status': 'Selesai',
+      'labor': 'Rp 6.840.000',
+      'fertilizer': 'Rp 3.847.500',
+      'seed': 'Rp 2.422.500',
+      'other': 'Rp 1.140.000',
     },
     {
+      'seasonNumber': 2,
       'title': 'Musim Kedua (2023)',
       'period': 'Mei - Sep 2023 • Lahan Blok A',
       'expenses': 'Rp 12.800.000',
       'harvest': '2.850 kg tembakau',
       'status': 'Selesai',
+      'labor': 'Rp 6.144.000',
+      'fertilizer': 'Rp 3.456.000',
+      'seed': 'Rp 2.176.000',
+      'other': 'Rp 1.024.000',
     },
     {
+      'seasonNumber': 1,
       'title': 'Musim Pertama (2022)',
       'period': 'Jun - Okt 2022 • Lahan Blok A',
       'expenses': 'Rp 11.450.000',
       'harvest': '2.600 kg tembakau',
       'status': 'Selesai',
+      'labor': 'Rp 5.496.000',
+      'fertilizer': 'Rp 3.091.500',
+      'seed': 'Rp 1.946.500',
+      'other': 'Rp 916.000',
     },
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7F5),
-      appBar: AppHeader(
-        showBack: true,
-        title: 'Rekap Semua Musim',
-        backgroundColor: const Color(0xE6F4F7F5),
-        showBottomBorder: true,
-        trailing: AppHeaderActionButton(
-          icon: Icons.sync_rounded,
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Sinkronisasi data semua musim berhasil diperbarui!'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-          },
-        ),
-      ),
+      backgroundColor: const Color(0xFFF0EFE9),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeaderTitleSection(),
-              const SizedBox(height: 16),
-              _buildAllSeasonsSummaryCard(),
-              const SizedBox(height: 24),
-              _buildAllSeasonsHistoryList(),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Header Judul Halaman
-  Widget _buildHeaderTitleSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Biaya & Pengeluaran',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.6,
-                color: Color(0xFF022C22),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF064E3B),
-                borderRadius: BorderRadius.circular(9999),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.check_rounded, color: Colors.white, size: 14),
-                  SizedBox(width: 4),
-                  Text(
-                    'Semua Musim',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Akumulasi menyeluruh pengeluaran operasional dari seluruh musim tanam.',
-          style: TextStyle(
-            fontSize: 12,
-            height: 1.5,
-            color: Color(0xFF64748B),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // 1. Ringkasan Total & Visualisasi Donut Chart Akumulasi
-  Widget _buildAllSeasonsSummaryCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0x0D022C22)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0A000000),
-            blurRadius: 4,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Donut Chart 176x176
-          SizedBox(
-            width: 176,
-            height: 176,
-            child: Stack(
-              alignment: Alignment.center,
+        child: RetroFrame(
+          backgroundColor: AppColors.sage,
+          margin: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CustomPaint(
-                  size: const Size(176, 176),
-                  painter: _AllSeasonsRingProgressPainter(),
+                // Header dengan tombol Sinkronisasi
+                AppHeader(
+                  showBack: true,
+                  title: 'REKAP SEMUA MUSIM',
+                  subtitle: 'ARSIP KEUANGAN // PERKEBUNAN',
+                  padding: EdgeInsets.zero,
+                  height: null,
+                  trailing: AppHeaderActionButton(
+                    icon: Icons.sync_rounded,
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Sinkronisasi data semua musim berhasil diperbarui!'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFECFDF5),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFFD1FAE5).withValues(alpha: 0.6)),
-                        boxShadow: const [
-                          BoxShadow(color: Color(0x0A000000), blurRadius: 2, offset: Offset(0, 1)),
-                        ],
-                      ),
-                      child: const Icon(Icons.spa_rounded, color: Color(0xFF047857), size: 18),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'SEMUA MUSIM',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: -0.3,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
+                const SizedBox(height: 14),
+
+                // 1. Kartu Akumulasi Biaya Semua Musim
+                _buildAccumulatedHeaderCard(),
+                const SizedBox(height: 16),
+
+                // 2. Daftar Riwayat Arsip Musim Tanam
+                _buildSeasonHistorySection(),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          const Text(
-            'TOTAL BIAYA TERCATAT',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.3,
-              color: Color(0xFF64748B),
-            ),
-          ),
-          const SizedBox(height: 2),
-          const Text(
-            'Rp 38,5 jt',
-            style: TextStyle(
-              fontSize: 30,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.75,
-              color: Color(0xFF14532D),
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Akumulasi seluruh pengeluaran dari 3 musim tanam',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12,
-              color: Color(0xFF94A3B8),
-            ),
-          ),
-          const SizedBox(height: 20),
-          // Header Kategori Akumulasi
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'KATEGORI AKUMULASI',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.3,
-                  color: Color(0xFF334155),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE2E8F0).withValues(alpha: 0.7),
-                  borderRadius: BorderRadius.circular(9999),
-                ),
-                child: const Text(
-                  '3 Musim',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildAccumulatedCategoryGrid(),
-        ],
+        ),
       ),
     );
   }
 
-  // 2. Grid 2x2 Kategori Akumulasi
-  Widget _buildAccumulatedCategoryGrid() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildAccumulatedCard(
-                label: 'Buruh & Petik',
-                amount: 'Rp 18,5 jt',
-                percent: '48%',
-                icon: Icons.groups_rounded,
-                iconColor: const Color(0xFF065F46),
-                iconBg: const Color(0xFFD1FAE5),
-                textColor: const Color(0xFF065F46),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildAccumulatedCard(
-                label: 'Pupuk & Nutrisi',
-                amount: 'Rp 10,4 jt',
-                percent: '27%',
-                icon: Icons.science_outlined,
-                iconColor: const Color(0xFF3730A3),
-                iconBg: const Color(0xFFE0E7FF),
-                textColor: const Color(0xFF312E81),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: _buildAccumulatedCard(
-                label: 'Bibit & Olah Lahan',
-                amount: 'Rp 6,5 jt',
-                percent: '17%',
-                icon: Icons.spa_outlined,
-                iconColor: const Color(0xFF115E59),
-                iconBg: const Color(0xFFCCFBF1),
-                textColor: const Color(0xFF115E59),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildAccumulatedCard(
-                label: 'Logistik & Lain',
-                amount: 'Rp 3,1 jt',
-                percent: '8%',
-                icon: Icons.local_shipping_outlined,
-                iconColor: const Color(0xFF92400E),
-                iconBg: const Color(0xFFFEF3C7),
-                textColor: const Color(0xFF92400E),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAccumulatedCard({
-    required String label,
-    required String amount,
-    required String percent,
-    required IconData icon,
-    required Color iconColor,
-    required Color iconBg,
-    required Color textColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
-        boxShadow: const [
-          BoxShadow(color: Color(0x0A000000), blurRadius: 2, offset: Offset(0, 1)),
-        ],
-      ),
+  Widget _buildAccumulatedHeaderCard() {
+    return RetroCard(
+      tapeTag: 'TOTAL AKUMULASI // 3 MUSIM TANAM',
+      rightTag: 'ARSIP KAS',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const MicroText('TOTAL AKUMULASI BIAYA', fontSize: 9.5, color: AppColors.muted),
+          const SizedBox(height: 4),
+          Text(
+            'Rp 38.500.000',
+            style: AppTypography.display(
+              fontSize: 26,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -1,
+              color: AppColors.ink,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const TaperedDivider(centerLabel: 'KATEGORI AKUMULASI'),
+          const SizedBox(height: 8),
+
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: iconBg,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: iconColor, size: 16),
+              Expanded(
+                child: _buildSmallCategoryPill('Buruh & Petik', 'Rp 18.500.000', AppColors.forest),
               ),
-              Text(
-                percent,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF475569),
-                ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildSmallCategoryPill('Pupuk & Nutrisi', 'Rp 10.400.000', AppColors.limeDeep),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF64748B),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            amount,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: textColor,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: _buildSmallCategoryPill('Bibit & Olah', 'Rp 6.500.000', AppColors.orange),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildSmallCategoryPill('Lainnya/Alat', 'Rp 3.100.000', AppColors.ink),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  // 3. Section Riwayat Musim Tanam Sebelumnya
-  Widget _buildAllSeasonsHistoryList() {
+  Widget _buildSmallCategoryPill(String title, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppColors.ink, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          MicroText(title, fontSize: 8.5, color: color, fontWeight: FontWeight.w800),
+          const SizedBox(height: 2),
+          Text(value, style: AppTypography.mono(fontSize: 9.5, fontWeight: FontWeight.w800)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSeasonHistorySection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Riwayat Musim Tanam',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF1E293B),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE2E8F0).withValues(alpha: 0.7),
-                borderRadius: BorderRadius.circular(9999),
-              ),
-              child: Text(
-                '${_seasonHistory.length} Musim Selesai',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1E293B),
+        const TaperedDivider(centerLabel: 'RIWAYAT MUSIM TANAM // ARSIP'),
+        const SizedBox(height: 6),
+
+        ..._seasonHistory.asMap().entries.map((entry) {
+          final index = entry.key;
+          final season = entry.value;
+
+          return RetroCard(
+            tapeTag: 'ARSIP TAHUNAN // REKAP',
+            rightTag: season['status'] as String,
+            margin: const EdgeInsets.only(bottom: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      season['title'] as String,
+                      style: AppTypography.display(fontSize: 14, fontWeight: FontWeight.w900),
+                    ),
+                    const StatusChip(label: 'SELESAI', variant: StatusChipVariant.lime, fontSize: 8),
+                  ],
                 ),
-              ),
+                const SizedBox(height: 2),
+                MicroText(season['period'] as String, fontSize: 9.5, color: AppColors.muted),
+                const SizedBox(height: 8),
+
+                Row(
+                  children: [
+                    Text(
+                      season['expenses'] as String,
+                      style: AppTypography.mono(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.red),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '•  ${season['harvest']}',
+                      style: AppTypography.mono(fontSize: 11, color: AppColors.ink),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                const Divider(color: AppColors.ink, height: 1, thickness: 1),
+                const SizedBox(height: 8),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    _buildMiniActionBtn('DETAIL', Icons.visibility_outlined, AppColors.paper, () => _showSeasonDetail(season)),
+                    const SizedBox(width: 6),
+                    _buildMiniActionBtn('EDIT', Icons.edit_outlined, AppColors.lime, () => _applyAndReturnSeason(season)),
+                    const SizedBox(width: 6),
+                    _buildMiniActionBtn('HAPUS', Icons.delete_outline_rounded, const Color(0xFFFED7AA), () => _confirmDeleteSeason(index, season)),
+                  ],
+                ),
+              ],
             ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildMiniActionBtn(String label, IconData icon, Color bg, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: AppColors.ink, width: 1.2),
+          boxShadow: const [
+            BoxShadow(color: AppColors.ink, offset: Offset(1.5, 1.5)),
           ],
         ),
-        const SizedBox(height: 12),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _seasonHistory.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final season = _seasonHistory[index];
-            return Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFF1F5F9)),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x0A000000), blurRadius: 2, offset: Offset(0, 1)),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 10,
-                            height: 10,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF16A34A),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            season['title'] as String,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF1E293B),
-                            ),
-                          ),
-                        ],
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFECFDF5),
-                          borderRadius: BorderRadius.circular(9999),
-                        ),
-                        child: const Text(
-                          'Selesai',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF047857),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    season['period'] as String,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF64748B),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Text(
-                        'Total: ${season['expenses']}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF065F46),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '•  ${season['harvest']}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF94A3B8),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Divider(height: 1, color: Color(0xFFF8FAFC)),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      _buildMiniButton(
-                        label: 'Detail',
-                        icon: Icons.visibility_outlined,
-                        bg: const Color(0xFFF8FAFC),
-                        fg: const Color(0xFF1E293B),
-                        border: const Color(0xFFE2E8F0),
-                        onTap: () => _showSeasonDetail(season),
-                      ),
-                      const SizedBox(width: 8),
-                      _buildMiniButton(
-                        label: 'Edit',
-                        icon: Icons.edit_outlined,
-                        bg: const Color(0xFFF0FDF4),
-                        fg: const Color(0xFF166534),
-                        border: const Color(0xFFBBF7D0),
-                        onTap: () {
-                          if (Navigator.canPop(context)) {
-                            Navigator.pop(context);
-                          } else {
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(builder: (context) => const FinanceScreen()),
-                            );
-                          }
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      _buildMiniButton(
-                        label: 'Hapus',
-                        icon: Icons.delete_outline_rounded,
-                        bg: const Color(0xFFFEF2F2),
-                        fg: const Color(0xFFDC2626),
-                        border: const Color(0xFFFECACA),
-                        onTap: () => _confirmDeleteSeason(index, season),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: AppColors.ink),
+            const SizedBox(width: 4),
+            MicroText(label, fontSize: 8.5, color: AppColors.ink, fontWeight: FontWeight.w900),
+          ],
         ),
+      ),
+    );
+  }
+
+  void _applyAndReturnSeason(Map<String, dynamic> season) {
+    FinanceDataStore.activeSeasonData = season;
+    final seasonNum = season['seasonNumber'] as int?;
+    final rawTitle = season['title'] as String? ?? '';
+    final lowerTitle = rawTitle.toLowerCase();
+
+    if (seasonNum == 3 || lowerTitle.contains('ketiga') || lowerTitle.contains('musim 3')) {
+      FinanceDataStore.activeSeasonTitle = 'Biaya & Pengeluaran Musim 3';
+    } else if (seasonNum == 2 || lowerTitle.contains('kedua') || lowerTitle.contains('musim 2')) {
+      FinanceDataStore.activeSeasonTitle = 'Biaya & Pengeluaran Musim 2';
+    } else if (seasonNum == 1 || lowerTitle.contains('pertama') || lowerTitle.contains('kesatu') || lowerTitle.contains('musim 1')) {
+      FinanceDataStore.activeSeasonTitle = 'Biaya & Pengeluaran Musim 1';
+    } else if (rawTitle.isNotEmpty) {
+      if (lowerTitle.startsWith('biaya & pengeluaran')) {
+        FinanceDataStore.activeSeasonTitle = rawTitle;
+      } else {
+        FinanceDataStore.activeSeasonTitle = 'Biaya & Pengeluaran $rawTitle';
+      }
+    }
+    if (season['expenses'] != null) {
+      FinanceDataStore.activeTotalExpense = season['expenses'] as String;
+    }
+
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context, season);
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => FinanceScreen(initialSeasonData: season),
+        ),
+      );
+    }
+  }
+
+  void _showSeasonDetail(Map<String, dynamic> season) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: AppColors.paper,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          border: Border(
+            top: BorderSide(color: AppColors.ink, width: 2),
+            left: BorderSide(color: AppColors.ink, width: 2),
+            right: BorderSide(color: AppColors.ink, width: 2),
+          ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      season['title'] as String,
+                      style: AppTypography.display(fontSize: 16, fontWeight: FontWeight.w900),
+                    ),
+                    const StatusChip(label: 'ARSIP RESMI', variant: StatusChipVariant.lime),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                MicroText(season['period'] as String, fontSize: 9.5, color: AppColors.muted),
+                const SizedBox(height: 14),
+
+                // 4 Kategori Rincian Biaya Musim (Format Baris Tanpa Persen)
+                _buildDetailRow('Buruh & Petik:', (season['labor'] ?? 'Rp 6.840.000') as String),
+                const SizedBox(height: 8),
+                _buildDetailRow('Pupuk & Nutrisi:', (season['fertilizer'] ?? 'Rp 3.847.500') as String),
+                const SizedBox(height: 8),
+                _buildDetailRow('Bibit & Olah Lahan:', (season['seed'] ?? 'Rp 2.422.500') as String),
+                const SizedBox(height: 8),
+                _buildDetailRow('Lainnya / Tambahan:', (season['other'] ?? 'Rp 1.140.000') as String),
+                const SizedBox(height: 10),
+                Container(
+                  height: 1.5,
+                  color: AppColors.ink.withValues(alpha: 0.15),
+                ),
+                const SizedBox(height: 8),
+                _buildDetailRow('Total Pengeluaran:', season['expenses'] as String),
+                const SizedBox(height: 18),
+                TrapezoidTabButton(
+                  label: 'TUTUP',
+                  height: 42,
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: AppTypography.body(fontSize: 12)),
+        Text(value, style: AppTypography.mono(fontSize: 12, fontWeight: FontWeight.w900)),
       ],
     );
   }
@@ -565,230 +381,35 @@ class _FinanceAllMusimScreenState extends State<FinanceAllMusimScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.delete_outline_rounded, color: Color(0xFFBE123C)),
-            SizedBox(width: 8),
-            Text(
-              'Hapus Arsip Musim',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF1E293B),
-              ),
-            ),
-          ],
+        backgroundColor: AppColors.paper,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: const BorderSide(color: AppColors.ink, width: 2),
         ),
+        title: Text('HAPUS ARSIP MUSIM', style: AppTypography.display(fontSize: 15, fontWeight: FontWeight.w900)),
         content: Text(
-          'Apakah Anda yakin ingin menghapus data "${season['title']}"? Data riwayat dan rekapitulasi musim ini akan dihapus permanen.',
-          style: const TextStyle(fontSize: 13, height: 1.45, color: Color(0xFF475569)),
+          'Apakah Anda yakin ingin menghapus data "${season['title']}"? Data riwayat musim ini akan dihapus permanen.',
+          style: AppTypography.body(fontSize: 12),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+            child: Text('BATAL', style: AppTypography.mono(fontSize: 11, color: AppColors.muted)),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFBE123C),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.red, foregroundColor: Colors.white),
             onPressed: () {
               Navigator.pop(ctx);
               final deletedTitle = season['title'];
-              setState(() {
-                _seasonHistory.removeAt(index);
-              });
+              setState(() => _seasonHistory.removeAt(index));
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Arsip "$deletedTitle" berhasil dihapus!'),
-                  backgroundColor: const Color(0xFFBE123C),
-                  duration: const Duration(seconds: 2),
-                ),
+                SnackBar(content: Text('Arsip "$deletedTitle" berhasil dihapus!')),
               );
             },
-            child: const Text('Ya, Hapus', style: TextStyle(fontWeight: FontWeight.w700)),
+            child: Text('YA, HAPUS', style: AppTypography.mono(fontSize: 11, fontWeight: FontWeight.w900)),
           ),
         ],
       ),
     );
   }
-
-  void _showSeasonDetail(Map<String, dynamic> season) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      backgroundColor: Colors.white,
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  season['title'] as String,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF022C22)),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFECFDF5),
-                    borderRadius: BorderRadius.circular(9999),
-                  ),
-                  child: const Text(
-                    'Arsip Selesai',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF047857)),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(season['period'] as String, style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-            const Divider(height: 28),
-            _buildDetailRow('Total Pengeluaran', season['expenses'] as String, isBold: true),
-            const SizedBox(height: 10),
-            _buildDetailRow('Total Hasil Timbangan', season['harvest'] as String),
-            const SizedBox(height: 10),
-            _buildDetailRow('Status Rekap', 'Tutup Buku & Terverifikasi'),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF064E3B),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Tutup', style: TextStyle(fontWeight: FontWeight.w700)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value, {bool isBold = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
-            color: isBold ? const Color(0xFF064E3B) : const Color(0xFF1E293B),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMiniButton({
-    required String label,
-    required IconData icon,
-    required Color bg,
-    required Color fg,
-    required Color border,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: fg),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: fg,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// Custom Painter untuk Donut Chart Segmen Semua Musim
-class _AllSeasonsRingProgressPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - 24) / 2;
-    const strokeWidth = 12.0;
-
-    final bgPaint = Paint()
-      ..color = const Color(0xFFF1F5F9)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
-
-    final greenPaint = Paint()
-      ..color = const Color(0xFF166534)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
-
-    final indigoPaint = Paint()
-      ..color = const Color(0xFF818CF8)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
-
-    final tealPaint = Paint()
-      ..color = const Color(0xFF115E59)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
-
-    final amberPaint = Paint()
-      ..color = const Color(0xFF92400E)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
-
-    // Background circle
-    canvas.drawCircle(center, radius, bgPaint);
-
-    double startAngle = -math.pi / 2;
-
-    // Buruh & Petik ~48%
-    final sweep1 = 2 * math.pi * 0.48;
-    canvas.drawArc(Rect.fromCircle(center: center, radius: radius), startAngle, sweep1, false, greenPaint);
-    startAngle += sweep1;
-
-    // Pupuk & Nutrisi ~27%
-    final sweep2 = 2 * math.pi * 0.27;
-    canvas.drawArc(Rect.fromCircle(center: center, radius: radius), startAngle, sweep2, false, indigoPaint);
-    startAngle += sweep2;
-
-    // Bibit & Olah Lahan ~17%
-    final sweep3 = 2 * math.pi * 0.17;
-    canvas.drawArc(Rect.fromCircle(center: center, radius: radius), startAngle, sweep3, false, tealPaint);
-    startAngle += sweep3;
-
-    // Logistik & Lain ~8%
-    final sweep4 = 2 * math.pi * 0.08;
-    canvas.drawArc(Rect.fromCircle(center: center, radius: radius), startAngle, sweep4, false, amberPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

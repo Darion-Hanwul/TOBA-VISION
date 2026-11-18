@@ -8,6 +8,7 @@ import 'weather/weather_screen.dart';
 
 class Shell extends StatefulWidget {
   const Shell({super.key});
+
   @override
   State<Shell> createState() => _ShellState();
 }
@@ -35,6 +36,7 @@ class _ShellState extends State<Shell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF0EFE9),
       body: SafeArea(bottom: false, child: _page()),
       bottomNavigationBar: AppBottomNav(index: _index, onTap: _go),
     );

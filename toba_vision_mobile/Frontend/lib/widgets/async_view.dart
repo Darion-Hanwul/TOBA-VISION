@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
+import 'retro/reel_loader.dart';
+import 'retro/retro_card.dart';
+import 'retro/trapezoid_tab_button.dart';
 
-/// Menangani loading / error (+ tombol coba lagi) / pull-to-refresh
-/// untuk semua layar yang mengambil data dari repository.
+/// Menangani loading (memakai ReelLoader kaset tape-deck) / error / pull-to-refresh
+/// untuk semua layar yang mengambil data asinkron.
 class AsyncView<T> extends StatefulWidget {
   final Future<T> Function() load;
   final Widget Function(BuildContext context, T data) builder;
+
   const AsyncView({super.key, required this.load, required this.builder});
 
   @override
@@ -35,42 +39,66 @@ class _AsyncViewState<T> extends State<AsyncView<T>> {
       future: _future,
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator(color: AppColors.green));
-        }
-        if (snap.hasError) {
-          return Center(
+          return const Center(
             child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.muted),
-                  const SizedBox(height: 12),
-                  const Text('Data belum bisa dimuat',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                  const SizedBox(height: 4),
-                  Text('${snap.error}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: AppColors.muted, fontSize: 12)),
-                  const SizedBox(height: 16),
-                  FilledButton(
-                    style: FilledButton.styleFrom(backgroundColor: AppColors.forest),
-                    onPressed: _reload,
-                    child: const Text('Coba Lagi'),
-                  ),
-                ],
+              padding: EdgeInsets.all(40),
+              child: ReelLoader(
+                size: 44,
+                color: AppColors.ink,
+                label: 'MEMUAT DATA SISTEM...',
               ),
             ),
           );
         }
+
+        if (snap.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: RetroCard(
+                tapeTag: 'SYSTEM ERROR // TAPE READ FAIL',
+                rightTag: 'ERR-500',
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, size: 48, color: AppColors.orange),
+                    const SizedBox(height: 12),
+                    Text(
+                      'DATA BELUM BISA DIMUAT',
+                      style: AppTypography.display(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${snap.error}',
+                      textAlign: TextAlign.center,
+                      style: AppTypography.mono(
+                        fontSize: 11,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TrapezoidTabButton(
+                      label: 'COBA LAGI',
+                      height: 40,
+                      isExpanded: false,
+                      onPressed: _reload,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
         return RefreshIndicator(
-          color: AppColors.green,
+          color: AppColors.lime,
+          backgroundColor: AppColors.ink,
           onRefresh: _reload,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-            child: widget.builder(context, snap.data as T),
-          ),
+          child: widget.builder(context, snap.data as T),
         );
       },
     );

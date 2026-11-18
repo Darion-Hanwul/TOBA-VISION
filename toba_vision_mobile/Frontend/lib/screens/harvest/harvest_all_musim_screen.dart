@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
+import '../../core/theme.dart';
 import '../../widgets/app_header.dart';
+import '../../widgets/retro/blade_ornament.dart';
+import '../../widgets/retro/micro_text.dart';
+import '../../widgets/retro/retro_card.dart';
+import '../../widgets/retro/retro_frame.dart';
+import '../../widgets/retro/status_chip.dart';
+import '../../widgets/retro/trapezoid_tab_button.dart';
 import 'harvest_screen.dart';
 
 class HarvestAllMusimScreen extends StatefulWidget {
@@ -68,34 +75,46 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7F5),
-      appBar: AppHeader(
-        showBack: true,
-        title: 'Rekap Semua Musim Panen',
-        backgroundColor: const Color(0xE6F4F7F5),
-        showBottomBorder: true,
-        trailing: AppHeaderActionButton(
-          icon: Icons.sync_rounded,
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Sinkronisasi data panen semua musim berhasil diperbarui!'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-          },
-        ),
-      ),
+      backgroundColor: const Color(0xFFF0EFE9),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildAccumulatedHeaderCard(),
-              const SizedBox(height: 24),
-              _buildSeasonHistorySection(),
-            ],
+        child: RetroFrame(
+          backgroundColor: AppColors.sage,
+          margin: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header dengan tombol Sinkronisasi
+                AppHeader(
+                  showBack: true,
+                  title: 'REKAP SEMUA MUSIM',
+                  subtitle: 'SIKLUS PANEN // TEMBAKAU',
+                  padding: EdgeInsets.zero,
+                  height: null,
+                  trailing: AppHeaderActionButton(
+                    icon: Icons.sync_rounded,
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Sinkronisasi data panen semua musim berhasil diperbarui!'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // 1. Header Akumulasi Panen Semua Musim
+                _buildAccumulatedHeaderCard(),
+                const SizedBox(height: 16),
+
+                // 2. Daftar Riwayat Arsip Musim Panen
+                _buildSeasonHistorySection(),
+              ],
+            ),
           ),
         ),
       ),
@@ -104,91 +123,82 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
 
   // 1. Header Akumulasi Panen Semua Musim
   Widget _buildAccumulatedHeaderCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0A000000),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
+    return RetroCard(
+      tapeTag: 'TOTAL AKUMULASI // REKAP PANEN',
+      rightTag: '3 MUSIM SELESAI',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFDCFCE7),
-                  borderRadius: BorderRadius.circular(9999),
-                  border: Border.all(color: const Color(0xFFA7F3D0)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(Icons.agriculture_rounded, size: 12, color: Color(0xFF064E3B)),
-                    SizedBox(width: 4),
-                    Text(
-                      'TOTAL AKUMULASI PANEN',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.8,
-                        color: Color(0xFF064E3B),
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.lime,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: AppColors.ink, width: 1.2),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.agriculture_rounded, size: 12, color: AppColors.ink),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: MicroText.bold(
+                          'TOTAL AKUMULASI PANEN',
+                          color: AppColors.ink,
+                          size: 9.5,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE2E8F0).withValues(alpha: 0.7),
-                  borderRadius: BorderRadius.circular(9999),
-                ),
-                child: const Text(
-                  '3 Musim Selesai',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
-                ),
-              ),
+              const SizedBox(width: 8),
+              StatusChip.dark('3 MUSIM SELESAI'),
             ],
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             '8.650 kg',
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -1,
-              color: Color(0xFF064E3B),
+            style: AppTypography.display(
+              size: 34,
+              weight: FontWeight.w900,
+              color: AppColors.ink,
             ),
           ),
-          const SizedBox(height: 4),
-          const Text(
-            'Total Keuntungan Kotor Mentah: Rp 235.100.000',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF166534),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.lime.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: AppColors.ink, width: 1.5),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.monetization_on_outlined, size: 16, color: AppColors.ink),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Total Keuntungan Kotor Mentah: Rp 235.100.000',
+                    style: AppTypography.mono(
+                      size: 11.5,
+                      weight: FontWeight.w700,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          const Text(
+          const SizedBox(height: 8),
+          MicroText.regular(
             'Akumulasi dari 21 kali siklus pemetikan daun tembakau (7 petikan per musim tanam).',
-            style: TextStyle(
-              fontSize: 11,
-              height: 1.4,
-              color: Color(0xFF64748B),
-            ),
+            color: AppColors.ink.withValues(alpha: 0.7),
+            size: 10.5,
           ),
         ],
       ),
@@ -203,40 +213,31 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'Riwayat Musim Panen',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.3,
-                    color: Color(0xFF0F172A),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Riwayat Musim Panen',
+                    style: AppTypography.display(
+                      size: 16,
+                      weight: FontWeight.w800,
+                      color: AppColors.ink,
+                    ),
                   ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Catatan 7 siklus petikan daun tembakau tiap musim',
-                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                ),
-              ],
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: const Color(0xFFDCFCE7),
-                borderRadius: BorderRadius.circular(9999),
-                border: Border.all(color: const Color(0xFFA7F3D0)),
-              ),
-              child: const Text(
-                '7 Petikan / Musim',
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF064E3B)),
+                  const SizedBox(height: 2),
+                  MicroText.regular(
+                    'Catatan 7 siklus petikan daun tembakau tiap musim',
+                    color: AppColors.ink.withValues(alpha: 0.65),
+                  ),
+                ],
               ),
             ),
+            const SizedBox(width: 8),
+            StatusChip.lime('7 PETIKAN / MUSIM'),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
         ListView.separated(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -244,16 +245,9 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
           separatorBuilder: (context, index) => const SizedBox(height: 12),
           itemBuilder: (context, index) {
             final season = _seasonHistory[index];
-            return Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x06000000), blurRadius: 4, offset: Offset(0, 2)),
-                ],
-              ),
+            return RetroCard(
+              tapeTag: season['title'] as String,
+              rightTag: season['status'] as String,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -263,28 +257,30 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
                       Expanded(
                         child: Text(
                           season['title'] as String,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF064E3B),
+                          style: AppTypography.display(
+                            size: 15,
+                            weight: FontWeight.w800,
+                            color: AppColors.ink,
                           ),
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFDCFCE7),
-                          borderRadius: BorderRadius.circular(9999),
-                          border: Border.all(color: const Color(0xFFA7F3D0)),
+                          color: AppColors.lime,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: AppColors.ink, width: 1.2),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.check_circle_rounded, size: 11, color: Color(0xFF166534)),
+                            const Icon(Icons.check_circle_rounded, size: 12, color: AppColors.ink),
                             const SizedBox(width: 4),
-                            Text(
+                            MicroText.bold(
                               season['status'] as String,
-                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF166534)),
+                              size: 9.5,
+                              color: AppColors.ink,
                             ),
                           ],
                         ),
@@ -292,86 +288,82 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(
+                  MicroText.regular(
                     season['period'] as String,
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                    color: AppColors.ink.withValues(alpha: 0.65),
+                    size: 10.5,
                   ),
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      Text(
-                        season['revenue'] as String,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF166534),
+                      Expanded(
+                        child: Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 6,
+                          runSpacing: 2,
+                          children: [
+                            Text(
+                              season['revenue'] as String,
+                              style: AppTypography.mono(
+                                size: 14,
+                                weight: FontWeight.w900,
+                                color: AppColors.ink,
+                              ),
+                            ),
+                            Text(
+                              '• ${season['weight']}',
+                              style: AppTypography.mono(
+                                size: 12,
+                                weight: FontWeight.w700,
+                                color: AppColors.ink.withValues(alpha: 0.75),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        '•  ${season['weight']}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF334155),
-                        ),
-                      ),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          season['cycles'] as String,
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
-                        ),
-                      ),
+                      StatusChip.dark(season['cycles'] as String),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  const Divider(height: 1, color: Color(0xFFF8FAFC)),
                   const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      _buildMiniButton(
-                        label: 'Detail',
-                        icon: Icons.visibility_outlined,
-                        bg: const Color(0xFFF8FAFC),
-                        fg: const Color(0xFF1E293B),
-                        border: const Color(0xFFE2E8F0),
-                        onTap: () => _showSeasonDetail(season),
-                      ),
-                      const SizedBox(width: 8),
-                      _buildMiniButton(
-                        label: 'Edit',
-                        icon: Icons.edit_outlined,
-                        bg: const Color(0xFFF0FDF4),
-                        fg: const Color(0xFF166534),
-                        border: const Color(0xFFBBF7D0),
-                        onTap: () {
-                          if (Navigator.canPop(context)) {
-                            Navigator.pop(context);
-                          } else {
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(builder: (context) => const HarvestScreen()),
-                            );
-                          }
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      _buildMiniButton(
-                        label: 'Hapus',
-                        icon: Icons.delete_outline_rounded,
-                        bg: const Color(0xFFFEF2F2),
-                        fg: const Color(0xFFDC2626),
-                        border: const Color(0xFFFECACA),
-                        onTap: () => _confirmDeleteSeason(index, season),
-                      ),
-                    ],
+                  const TaperedDivider(),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        _buildMiniActionBtn(
+                          'DETAIL',
+                          Icons.visibility_outlined,
+                          AppColors.paper,
+                          () => _showSeasonDetail(season),
+                        ),
+                        _buildMiniActionBtn(
+                          'EDIT',
+                          Icons.edit_outlined,
+                          AppColors.lime,
+                          () {
+                            if (Navigator.canPop(context)) {
+                              Navigator.pop(context);
+                            } else {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(builder: (context) => const HarvestScreen()),
+                              );
+                            }
+                          },
+                        ),
+                        _buildMiniActionBtn(
+                          'HAPUS',
+                          Icons.delete_outline_rounded,
+                          const Color(0xFFFED7AA),
+                          () => _confirmDeleteSeason(index, season),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -382,37 +374,25 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
     );
   }
 
-  Widget _buildMiniButton({
-    required String label,
-    required IconData icon,
-    required Color bg,
-    required Color fg,
-    required Color border,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
+  Widget _buildMiniActionBtn(String label, IconData icon, Color bg, VoidCallback onTap) {
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: bg,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: border),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: AppColors.ink, width: 1.2),
+          boxShadow: const [
+            BoxShadow(color: AppColors.ink, offset: Offset(1.5, 1.5)),
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: fg),
+            Icon(icon, size: 12, color: AppColors.ink),
             const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: fg,
-              ),
-            ),
+            MicroText(label, fontSize: 8.5, color: AppColors.ink, fontWeight: FontWeight.w900),
           ],
         ),
       ),
@@ -424,115 +404,152 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      backgroundColor: Colors.white,
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.65,
-        maxChildSize: 0.9,
-        minChildSize: 0.4,
-        expand: false,
-        builder: (context, scrollController) => Padding(
-          padding: const EdgeInsets.all(24),
-          child: ListView(
-            controller: scrollController,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    season['title'] as String,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF022C22)),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: AppColors.paper,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          border: Border.all(color: AppColors.ink, width: 2),
+        ),
+        child: DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          maxChildSize: 0.92,
+          minChildSize: 0.4,
+          expand: false,
+          builder: (context, scrollController) => Padding(
+            padding: const EdgeInsets.all(20),
+            child: ListView(
+              controller: scrollController,
+              children: [
+                // Top Grab Bar
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFECFDF5),
-                      borderRadius: BorderRadius.circular(9999),
-                    ),
-                    child: const Text(
-                      '7 Petikan Lengkap',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF047857)),
+                      color: AppColors.ink.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(season['period'] as String, style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-              const Divider(height: 24),
-              _buildDetailRow('Total Hasil Bobot Panen', season['weight'] as String, isBold: true),
-              const SizedBox(height: 8),
-              _buildDetailRow('Total Pendapatan Kotor Mentah', season['revenue'] as String, isBold: true, valueColor: const Color(0xFF166534)),
-              const SizedBox(height: 8),
-              _buildDetailRow('Siklus Tembakau', '7 Petikan Daun (P1 s/d P7) Selesai'),
-              const Divider(height: 24),
-              const Text(
-                'Rincian 7 Tahap Siklus Petikan Daun:',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1E293B)),
-              ),
-              const SizedBox(height: 10),
-              ...stages.map((stg) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDCFCE7),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          stg['stage'] as String,
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF064E3B)),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          stg['label'] as String,
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
-                        ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            stg['weight'] as String,
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF064E3B)),
-                          ),
-                          Text(
-                            stg['revenue'] as String,
-                            style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                );
-              }),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 46,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF064E3B),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Tutup', style: TextStyle(fontWeight: FontWeight.w700)),
                 ),
-              ),
-            ],
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        season['title'] as String,
+                        style: AppTypography.display(
+                          size: 18,
+                          weight: FontWeight.w800,
+                          color: AppColors.ink,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    StatusChip.lime('7 PETIKAN LENGKAP'),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                MicroText.regular(
+                  season['period'] as String,
+                  color: AppColors.ink.withValues(alpha: 0.65),
+                ),
+                const SizedBox(height: 14),
+                const TaperedDivider(),
+                const SizedBox(height: 14),
+                _buildDetailRow('Total Hasil Bobot Panen', season['weight'] as String, isBold: true),
+                const SizedBox(height: 8),
+                _buildDetailRow('Total Pendapatan Kotor Mentah', season['revenue'] as String, isBold: true, valueColor: AppColors.limeDeep),
+                const SizedBox(height: 8),
+                _buildDetailRow('Siklus Tembakau', '7 Petikan Daun (P1 s/d P7) Selesai'),
+                const SizedBox(height: 14),
+                const TaperedDivider(),
+                const SizedBox(height: 14),
+                Text(
+                  'Rincian 7 Tahap Siklus Petikan Daun:',
+                  style: AppTypography.display(
+                    size: 13,
+                    weight: FontWeight.w700,
+                    color: AppColors.ink,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ...stages.map((stg) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppColors.ink, width: 1.5),
+                      boxShadow: const [
+                        BoxShadow(color: AppColors.ink, offset: Offset(1.5, 1.5)),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.lime,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: AppColors.ink, width: 1),
+                          ),
+                          child: Text(
+                            stg['stage'] as String,
+                            style: AppTypography.mono(
+                              size: 11,
+                              weight: FontWeight.w900,
+                              color: AppColors.ink,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            stg['label'] as String,
+                            style: AppTypography.body(
+                              size: 12,
+                              weight: FontWeight.w600,
+                              color: AppColors.ink,
+                            ),
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              stg['weight'] as String,
+                              style: AppTypography.mono(
+                                size: 12,
+                                weight: FontWeight.w700,
+                                color: AppColors.ink,
+                              ),
+                            ),
+                            Text(
+                              stg['revenue'] as String,
+                              style: AppTypography.mono(
+                                size: 10,
+                                color: AppColors.ink.withValues(alpha: 0.6),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                const SizedBox(height: 18),
+                TrapezoidTabButton(
+                  label: '----TUTUP DETAIL----',
+                  color: AppColors.ink,
+                  textColor: Colors.white,
+                  height: 44,
+                  onTap: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -542,14 +559,25 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
   Widget _buildDetailRow(String label, String value, {bool isBold = false, Color? valueColor}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF475569))),
+        Flexible(
+          child: Text(
+            label,
+            style: AppTypography.mono(
+              size: 12,
+              color: AppColors.ink.withValues(alpha: 0.7),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
         Text(
           value,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
-            color: valueColor ?? (isBold ? const Color(0xFF064E3B) : const Color(0xFF1E293B)),
+          textAlign: TextAlign.right,
+          style: AppTypography.mono(
+            size: 12.5,
+            weight: isBold ? FontWeight.w800 : FontWeight.w600,
+            color: valueColor ?? AppColors.ink,
           ),
         ),
       ],
@@ -560,31 +588,53 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        backgroundColor: AppColors.paper,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: const BorderSide(color: AppColors.ink, width: 2),
+        ),
+        title: Row(
           children: [
-            Icon(Icons.delete_outline_rounded, color: Color(0xFFBE123C)),
-            SizedBox(width: 8),
+            const Icon(Icons.delete_outline_rounded, color: AppColors.red),
+            const SizedBox(width: 8),
             Text(
               'Hapus Arsip Panen',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
+              style: AppTypography.display(
+                size: 17,
+                weight: FontWeight.w800,
+                color: AppColors.ink,
+              ),
             ),
           ],
         ),
         content: Text(
           'Apakah Anda yakin ingin menghapus data panen "${season['title']}"? Seluruh riwayat timbangan 7 siklus petikan akan dihapus.',
-          style: const TextStyle(fontSize: 13, height: 1.45, color: Color(0xFF475569)),
+          style: AppTypography.body(
+            size: 13,
+            color: AppColors.ink,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+            child: Text(
+              'Batal',
+              style: AppTypography.mono(
+                size: 12,
+                weight: FontWeight.w700,
+                color: AppColors.ink.withValues(alpha: 0.7),
+              ),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFBE123C),
+              backgroundColor: AppColors.red,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+                side: const BorderSide(color: AppColors.ink, width: 1.5),
+              ),
+              elevation: 0,
             ),
             onPressed: () {
               Navigator.pop(ctx);
@@ -592,13 +642,19 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
               setState(() => _seasonHistory.removeAt(index));
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Data "$deletedTitle" berhasil dihapus!'),
-                  backgroundColor: const Color(0xFFBE123C),
+                  content: Text(
+                    'Data "$deletedTitle" berhasil dihapus!',
+                    style: AppTypography.mono(size: 12, color: Colors.white),
+                  ),
+                  backgroundColor: AppColors.ink,
                   duration: const Duration(seconds: 2),
                 ),
               );
             },
-            child: const Text('Ya, Hapus', style: TextStyle(fontWeight: FontWeight.w700)),
+            child: Text(
+              'Ya, Hapus',
+              style: AppTypography.mono(size: 12, weight: FontWeight.w700),
+            ),
           ),
         ],
       ),

@@ -10,3 +10,15 @@ toba_vision_mobile/Backend/.env
 __pycache__/
 *.pyc
 toba_vision_mobile/Backend/__pycache__/
+
+# Flutter / Dart Build & Cache
+**/.dart_tool/
+**/build/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/android/local.properties
+**/ios/Flutter/ephemeral/
+**/macos/Flutter/ephemeral/
+**/GeneratedPluginRegistrant.*
+**/Generated.xcconfig
+**/flutter_export_environment.sh

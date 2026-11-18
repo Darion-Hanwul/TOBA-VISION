@@ -1,60 +1,25 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
 import 'app_logo.dart';
+import 'retro/chrome_wordmark.dart';
+import 'retro/micro_text.dart';
 
-/// Reusable Top Header / App Bar untuk aplikasi TOBA VISION.
-///
-/// Mendukung 2 mode penggunaan:
-/// 1. Main Screen Header:
-///    Logo brand daun/pertanian, nama 'TOBA VISION', lokasi/subtitle opsional,
-///    dan tombol aksi kanan (trailing) seperti profil atau sync.
-///
-/// 2. Sub-Screen / Form Header:
-///    Tombol kembali (back), judul halaman, dan aksi kanan (centang/simpan).
+/// Retro Y2K Walkman / Tape-Deck Top Header untuk TOBA VISION
 class AppHeader extends StatelessWidget implements PreferredSizeWidget {
-  /// Judul header. Default: 'TOBA VISION' (jika [showBack] = false).
   final String? title;
-
-  /// Subtitle di bawah judul (misal: 'TEMANGGUNG, JATENG').
   final String? subtitle;
-
-  /// Jika true, menampilkan tombol kembali (Back Arrow).
   final bool showBack;
-
-  /// Callback saat tombol back ditekan. Default: Navigator.maybePop(context).
   final VoidCallback? onBack;
-
-  /// Widget logo custom di sebelah kiri (menggantikan logo default).
   final Widget? leading;
-
-  /// Menggunakan logo vektor resmi TobaVisionLogo alih-alih icon. Default: false.
   final bool useAppLogo;
-
-  /// Icon untuk logo brand default jika [leading] tidak diset. Default: Icons.spa_rounded.
   final IconData logoIcon;
-
-  /// Warna background logo icon.
   final Color? logoBg;
-
-  /// Warna icon logo.
   final Color? logoColor;
-
-  /// Ukuran container logo. Default: 36.
   final double logoSize;
-
-  /// Widget aksi di sebelah kanan (misal: tombol profil, tombol sync, tombol simpan).
   final Widget? trailing;
-
-  /// Warna background header. Default: transparan.
   final Color? backgroundColor;
-
-  /// Menampilkan garis pemisah halus di bawah header.
   final bool showBottomBorder;
-
-  /// Padding dalam header.
   final EdgeInsetsGeometry? padding;
-
-  /// Tinggi header (default: 64). Jika null, tinggi menyesuaikan konten.
   final double? height;
 
   const AppHeader({
@@ -83,114 +48,86 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     return Container(
       height: height,
-      padding: padding ?? const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: padding ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: backgroundColor ?? Colors.transparent,
         border: showBottomBorder
             ? const Border(
-                bottom: BorderSide(color: Color(0x0D022C22), width: 1),
+                bottom: BorderSide(color: AppColors.ink, width: 2),
               )
             : null,
       ),
       child: SafeArea(
         bottom: false,
-        left: false,
-        right: false,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Sisi Kiri: Tombol Back ATAU Logo Brand + Judul
             Expanded(
-              child: showBack ? _buildBackTitle(context) : _buildBrandTitle(),
+              child: showBack ? _buildBackTitle(context) : _buildBrandTitle(context),
             ),
-
-            // Sisi Kanan: Widget Aksi (Profil, Sync, Centang, dll)
-            ?trailing,
+            if (trailing != null) ...[
+              const SizedBox(width: 12),
+              trailing!,
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildBrandTitle() {
-    if (leading != null) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          leading!,
-          const SizedBox(width: 10),
-          _buildTitleText(),
-        ],
-      );
-    }
-
-    if (useAppLogo) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TobaVisionLogo(size: logoSize),
-          const SizedBox(width: 10),
-          _buildTitleText(),
-        ],
-      );
-    }
-
-    final bg = logoBg ?? AppColors.forest.withValues(alpha: 0.1);
-    final fg = logoColor ?? AppColors.forest;
-
+  Widget _buildBrandTitle(BuildContext context) {
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: logoSize,
-          height: logoSize,
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(12),
+        if (leading != null)
+          leading!
+        else if (useAppLogo)
+          TobaVisionLogo(size: logoSize)
+        else
+          Container(
+            width: logoSize,
+            height: logoSize,
+            decoration: BoxDecoration(
+              color: logoBg ?? AppColors.ink,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: AppColors.ink, width: 1.5),
+              boxShadow: const [
+                BoxShadow(color: AppColors.ink, offset: Offset(2, 2)),
+              ],
+            ),
+            child: Icon(
+              logoIcon,
+              size: logoSize * 0.55,
+              color: logoColor ?? AppColors.lime,
+            ),
           ),
-          child: Icon(logoIcon, color: fg, size: logoSize * 0.52),
-        ),
         const SizedBox(width: 10),
-        _buildTitleText(),
-      ],
-    );
-  }
-
-  Widget _buildTitleText() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title ?? 'TOBA VISION',
-          style: const TextStyle(
-            fontFamily: kSerif,
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.6,
-            color: AppColors.forest,
-          ),
-        ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 2),
-          Row(
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.location_on_outlined, size: 12, color: AppColors.amber),
-              const SizedBox(width: 2),
-              Text(
-                subtitle!,
-                style: const TextStyle(
-                  fontFamily: kSerif,
-                  fontSize: 11,
-                  letterSpacing: 0.8,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.muted,
-                ),
+              if (title != null && title!.isNotEmpty)
+                Text(
+                  title!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.display(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                )
+              else
+                const ChromeWordmark(fontSize: 18),
+              const SizedBox(height: 2),
+              MicroText(
+                subtitle ?? 'TEMANGGUNG, JATENG • TB-SYS',
+                fontSize: 8.5,
+                color: AppColors.muted,
+                fontWeight: FontWeight.w700,
               ),
             ],
           ),
-        ],
+        ),
       ],
     );
   }
@@ -201,23 +138,47 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
         GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: onBack ?? () => Navigator.maybePop(context),
-          child: const Padding(
-            padding: EdgeInsets.only(right: 8),
-            child: Icon(Icons.arrow_back_rounded, color: AppColors.ink, size: 24),
+          child: Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: AppColors.paper,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: AppColors.ink, width: 1.8),
+              boxShadow: const [
+                BoxShadow(color: AppColors.ink, offset: Offset(2, 2)),
+              ],
+            ),
+            child: const Icon(
+              Icons.arrow_back_rounded,
+              color: AppColors.ink,
+              size: 20,
+            ),
           ),
         ),
+        const SizedBox(width: 12),
         Expanded(
-          child: Text(
-            title ?? '',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontFamily: kSerif,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.4,
-              color: AppColors.ink,
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title ?? 'KEMBALI',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.display(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.4,
+                ),
+              ),
+              if (subtitle != null && subtitle!.isNotEmpty)
+                MicroText(
+                  subtitle!,
+                  fontSize: 8.5,
+                  color: AppColors.muted,
+                ),
+            ],
           ),
         ),
       ],
@@ -225,7 +186,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
-/// Tombol aksi cepat di sisi kanan header (misal: icon profile, sync, check, dll).
+/// Tombol aksi cepat bergaya tombol fisik kaset audio (tactile button)
 class AppHeaderActionButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
@@ -251,12 +212,16 @@ class AppHeaderActionButton extends StatelessWidget {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: backgroundColor ?? AppColors.forest.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
+          color: backgroundColor ?? AppColors.paper,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: AppColors.ink, width: 1.8),
+          boxShadow: const [
+            BoxShadow(color: AppColors.ink, offset: Offset(2, 2)),
+          ],
         ),
         child: Icon(
           icon,
-          color: color ?? AppColors.forest,
+          color: color ?? AppColors.ink,
           size: size * 0.52,
         ),
       ),
