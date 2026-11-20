@@ -2,11 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/theme.dart';
-import '../widgets/retro/chrome_wordmark.dart';
-import '../widgets/retro/glass_phone.dart';
-import '../widgets/retro/marquee_text.dart';
-import '../widgets/retro/micro_text.dart';
-import '../widgets/retro/retro_frame.dart';
 import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -66,105 +61,68 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    const brandSage = Color(0xFFA3AB8E);
+    const brandInk = Color(0xFF0E0F0C);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF0EFE9), // Latar luar frame
+      backgroundColor: brandSage,
       body: SafeArea(
         child: GestureDetector(
           onTap: _navigateToLogin, // Ketuk layar untuk langsung melewati splash
           behavior: HitTestBehavior.opaque,
-          child: RetroFrame(
-            backgroundColor: AppColors.sage,
-            margin: const EdgeInsets.all(12),
-            child: Stack(
-              alignment: Alignment.center,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // Layer Aset Gambar Background (Opacity halus jika ada)
-                Positioned.fill(
-                  child: Opacity(
-                    opacity: 0.12,
+                // Logo Daun Tembakau
+                Container(
+                  width: 110,
+                  height: 110,
+                  decoration: BoxDecoration(
+                    color: brandSage,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: brandInk.withValues(alpha: 0.15),
+                        blurRadius: 18,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
                     child: Image.asset(
-                      'assets/splash screen.png',
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      'assets/branding/icon_foreground.png',
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Image.asset(
+                        'assets/branding/icon_1024.png',
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                 ),
+                const SizedBox(height: 20),
 
-                // Teks Raksasa Berjalan (Marquee) di belakang objek hero
-                Positioned(
-                  top: MediaQuery.of(context).size.height * 0.32,
-                  left: 0,
-                  right: 0,
-                  child: const Opacity(
-                    opacity: 0.22,
-                    child: MarqueeText(
-                      text: 'TOBA VISION • AI AGRICULTURE • TEMANGGUNG ',
-                      fontSize: 68,
-                      color: AppColors.ink,
-                      speed: 25,
-                    ),
+                // Nama Aplikasi
+                Text(
+                  'TOBA VISION',
+                  style: AppTypography.display(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2.0,
+                    color: brandInk,
                   ),
                 ),
+                const SizedBox(height: 6),
 
-                // Header Wordmark Krom di Tengah Atas
-                Positioned(
-                  top: 28,
-                  child: Column(
-                    children: [
-                      const MicroText(
-                        'TYPE 1 • NORMAL POSITION // AUDIO CASSETTE FEEL',
-                        fontSize: 8.5,
-                        color: AppColors.ink,
-                      ),
-                      const SizedBox(height: 6),
-                      const ChromeWordmark(fontSize: 28),
-                      const SizedBox(height: 4),
-                      const MicroText(
-                        'ASISTEN AI CERDAS PETANI TEMBAKAU MODERN',
-                        fontSize: 9,
-                        color: AppColors.muted,
-                        letterSpacing: 1.2,
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Objek Hero SMARTPHONE Clear-Shell di Tengah
-                Center(
-                  child: GlassPhone(
-                    width: 175,
-                    height: 290,
-                    rotationDegrees: 8.5,
-                    animateFloat: true,
-                  ),
-                ),
-
-                // Microtext Teknis di Bagian Bawah Layar
-                Positioned(
-                  bottom: 18,
-                  left: 16,
-                  right: 16,
-                  child: Column(
-                    children: [
-                      Container(
-                        height: 2,
-                        color: AppColors.ink,
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: const [
-                          MicroText('TOBA-VISION v2.4 AI', fontSize: 9),
-                          MicroText('TEMANGGUNG, JATENG', fontSize: 9),
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      const MicroText(
-                        'IDENTIFICATION NUMBER - TB-2026-088',
-                        fontSize: 8,
-                        color: AppColors.muted,
-                      ),
-                    ],
+                // Tagline
+                Text(
+                  'ASISTEN AI PETANI TEMBAKAU',
+                  style: AppTypography.mono(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.5,
+                    color: brandInk.withValues(alpha: 0.7),
                   ),
                 ),
               ],

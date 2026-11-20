@@ -14,10 +14,10 @@ void main() {
       ),
     );
 
-    // Verifikasi SplashScreen menampilkan widget Image dengan asset splash screen.png
+    // Verifikasi SplashScreen menampilkan widget Image logo
     expect(find.byType(Image), findsOneWidget);
     final imageWidget = tester.widget<Image>(find.byType(Image));
-    expect((imageWidget.image as AssetImage).assetName, 'assets/splash screen.png');
+    expect((imageWidget.image as AssetImage).assetName, 'assets/branding/icon_foreground.png');
 
     // Menunggu durasi timer splash selesai dan animasi transisi selesai
     await tester.pump(const Duration(milliseconds: 500));
