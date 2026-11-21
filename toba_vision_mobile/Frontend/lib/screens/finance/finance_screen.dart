@@ -1,5 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
+import '../../data/auth_session.dart';
+import '../../data/firestore_models.dart';
+import '../../data/firestore_service.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/retro/blade_ornament.dart';
 import '../../widgets/retro/micro_text.dart';
@@ -10,12 +14,6 @@ import '../../widgets/retro/trapezoid_tab_button.dart';
 import '../../widgets/retro/vu_meter_bar.dart';
 import 'finance_all_musim_screen.dart';
 import 'finance_screen_edit_upload.dart';
-
-class FinanceDataStore {
-  static String activeSeasonTitle = 'Biaya & Pengeluaran Musim 3';
-  static String activeTotalExpense = 'Rp 14.250.000';
-  static Map<String, dynamic>? activeSeasonData;
-}
 
 class FinanceScreen extends StatefulWidget {
   final bool showBack;
@@ -31,8 +29,11 @@ class _FinanceScreenState extends State<FinanceScreen> {
   final List<String> _periods = ['Musim Ini', 'Semua'];
 
   String _currentSeasonTitle = FinanceDataStore.activeSeasonTitle;
-  String _currentTotalExpense = FinanceDataStore.activeTotalExpense;
+  String _currentTotalExpense = 'Rp 0';
   late List<Map<String, dynamic>> _categories;
+
+  StreamSubscription<List<BiayaOperasionalModel>>? _biayaSub;
+  List<BiayaOperasionalModel> _firestoreBiayaList = [];
 
   @override
   void initState() {
@@ -40,42 +41,181 @@ class _FinanceScreenState extends State<FinanceScreen> {
     _initCategories();
     if (widget.initialSeasonData != null) {
       _applySeasonData(widget.initialSeasonData!);
-    } else if (FinanceDataStore.activeSeasonData != null) {
-      _applySeasonData(FinanceDataStore.activeSeasonData!);
     }
+    _listenToFirestore();
+  }
+
+  @override
+  void dispose() {
+    _biayaSub?.cancel();
+    super.dispose();
+  }
+
+  void _listenToFirestore() {
+    final idPetani = AuthSession.currentIdPetani;
+    if (idPetani.isEmpty) {
+      _applyFirestoreData([]);
+      return;
+    }
+
+    FirestoreService.instance.getOrCreateMusimAktif(idPetani).then((musim) {
+      if (!mounted) return;
+      setState(() {
+        _currentSeasonTitle = 'Biaya & Pengeluaran ${musim.judulMusim}';
+        FinanceDataStore.activeSeasonTitle = _currentSeasonTitle;
+      });
+      AuthSession.setActiveMusim(musim.idMusim);
+      _subscribeBiaya(idPetani, musim.idMusim);
+    });
+
+    final currentIdMusim = AuthSession.currentIdMusim;
+    if (currentIdMusim.isNotEmpty) {
+      _subscribeBiaya(idPetani, currentIdMusim);
+    }
+  }
+
+  void _subscribeBiaya(String idPetani, String idMusim) {
+    _biayaSub?.cancel();
+    if (idPetani.isEmpty || idMusim.isEmpty) {
+      _applyFirestoreData([]);
+      return;
+    }
+    _biayaSub = FirestoreService.instance.streamDaftarBiaya(idPetani, idMusim).listen((list) {
+      if (!mounted) return;
+      _applyFirestoreData(list);
+    }, onError: (_) {
+      // Graceful offline fallback
+    });
+  }
+
+  void _applyFirestoreData(List<BiayaOperasionalModel> list) {
+    _historyItems.clear();
+    if (list.isEmpty) {
+      setState(() {
+        _firestoreBiayaList = [];
+        _currentTotalExpense = 'Rp 0';
+        FinanceDataStore.activeTotalExpense = _currentTotalExpense;
+        for (final cat in _categories) {
+          cat['amount'] = 'Rp 0';
+          cat['ratio'] = 0.0;
+          cat['percentage'] = '0%';
+        }
+      });
+      return;
+    }
+
+    double total = 0;
+    double buruh = 0;
+    double pupuk = 0;
+    double bibit = 0;
+    double lainnya = 0;
+
+    for (final item in list) {
+      total += item.jumlahBiaya;
+      switch (item.kodeKategori) {
+        case 'BURUH':
+          buruh += item.jumlahBiaya;
+          break;
+        case 'PUPUK':
+          pupuk += item.jumlahBiaya;
+          break;
+        case 'BIBIT':
+          bibit += item.jumlahBiaya;
+          break;
+        case 'LAINNYA':
+        default:
+          lainnya += item.jumlahBiaya;
+          break;
+      }
+    }
+
+    setState(() {
+      _firestoreBiayaList = list;
+      _currentTotalExpense = _formatRupiah(total);
+      FinanceDataStore.activeTotalExpense = _currentTotalExpense;
+
+      _categories[0]['amount'] = _formatRupiahJt(buruh);
+      _categories[0]['ratio'] = total > 0 ? (buruh / total).clamp(0.0, 1.0) : 0.0;
+      _categories[0]['percentage'] = total > 0 ? '${((buruh / total) * 100).round()}%' : '0%';
+
+      _categories[1]['amount'] = _formatRupiahJt(pupuk);
+      _categories[1]['ratio'] = total > 0 ? (pupuk / total).clamp(0.0, 1.0) : 0.0;
+      _categories[1]['percentage'] = total > 0 ? '${((pupuk / total) * 100).round()}%' : '0%';
+
+      _categories[2]['amount'] = _formatRupiahJt(bibit);
+      _categories[2]['ratio'] = total > 0 ? (bibit / total).clamp(0.0, 1.0) : 0.0;
+      _categories[2]['percentage'] = total > 0 ? '${((bibit / total) * 100).round()}%' : '0%';
+
+      _categories[3]['amount'] = _formatRupiahJt(lainnya);
+      _categories[3]['ratio'] = total > 0 ? (lainnya / total).clamp(0.0, 1.0) : 0.0;
+      _categories[3]['percentage'] = total > 0 ? '${((lainnya / total) * 100).round()}%' : '0%';
+    });
+  }
+
+  String _formatRupiah(double val) {
+    final intVal = val.round();
+    final s = intVal.toString();
+    final reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+    final formatted = s.replaceAllMapped(reg, (Match m) => '${m[1]}.');
+    return 'Rp $formatted';
+  }
+
+  String _formatRupiahJt(double val) {
+    if (val >= 1000000) {
+      final jt = val / 1000000;
+      final jtStr = jt.toStringAsFixed(1).replaceAll('.', ',');
+      return 'Rp $jtStr jt';
+    } else if (val >= 1000) {
+      final rb = (val / 1000).round();
+      return 'Rp $rb rb';
+    }
+    return 'Rp ${val.round()}';
+  }
+
+  String _formatAngka(double val) {
+    final intVal = val.round();
+    final s = intVal.toString();
+    final reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+    return s.replaceAllMapped(reg, (Match m) => '${m[1]}.');
+  }
+
+  String _namaBulan(int m) {
+    const bulan = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    if (m >= 1 && m <= 12) return bulan[m - 1];
+    return '';
   }
 
   void _initCategories() {
     _categories = [
       {
         'name': 'Buruh Tani / Upah',
-        'amount': 'Rp 6,8 jt',
-        'ratio': 0.48,
-        'percentage': '48%',
+        'amount': 'Rp 0',
+        'ratio': 0.0,
+        'percentage': '0%',
         'icon': Icons.groups_rounded,
         'color': AppColors.forest,
       },
       {
         'name': 'Pupuk & Nutrisi',
-        'amount': 'Rp 3,8 jt',
-        'ratio': 0.27,
-        'percentage': '27%',
+        'amount': 'Rp 0',
+        'ratio': 0.0,
+        'percentage': '0%',
         'icon': Icons.science_outlined,
         'color': AppColors.limeDeep,
       },
       {
         'name': 'Bibit & Olah Lahan',
-        'amount': 'Rp 2,4 jt',
-        'ratio': 0.17,
-        'percentage': '17%',
+        'amount': 'Rp 0',
+        'ratio': 0.0,
+        'percentage': '0%',
         'icon': Icons.spa_outlined,
         'color': AppColors.orange,
       },
       {
         'name': 'Lainnya / Tambahan',
-        'amount': 'Rp 1,25 jt',
-        'ratio': 0.08,
-        'percentage': '8%',
+        'amount': 'Rp 0',
+        'ratio': 0.0,
+        'percentage': '0%',
         'icon': Icons.category_outlined,
         'color': AppColors.ink,
       },
@@ -88,6 +228,13 @@ class _FinanceScreenState extends State<FinanceScreen> {
   }
 
   void _applySeasonData(Map<String, dynamic> season) {
+    final idMusim = season['idMusim'] as String?;
+    if (idMusim != null && idMusim.isNotEmpty) {
+      AuthSession.setActiveMusim(idMusim);
+      FirestoreService.instance.setMusimAktif(AuthSession.currentIdPetani, idMusim);
+      _subscribeBiaya(AuthSession.currentIdPetani, idMusim);
+    }
+
     final seasonNum = season['seasonNumber'] as int?;
     final rawTitle = season['title'] as String? ?? '';
     final lowerTitle = rawTitle.toLowerCase();
@@ -143,98 +290,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
   }
 
   void _updateHistoryForSeason(Map<String, dynamic> season) {
-    final seasonNum = season['seasonNumber'] as int?;
-    final rawTitle = season['title'] as String? ?? '';
-    final lower = rawTitle.toLowerCase();
-
-    if (seasonNum == 2 || lower.contains('kedua') || lower.contains('musim 2')) {
-      _historyItems
-        ..clear()
-        ..addAll([
-          {
-            'title': 'Upah Petik Daun Bawah',
-            'date': '12 Sep 2023 • 8 Pekerja',
-            'amount': '-Rp 1.100.000',
-            'icon': Icons.groups_rounded,
-          },
-          {
-            'title': 'Pupuk ZA & NPK Daun',
-            'date': '18 Agu 2023 • Toko Tani Maju',
-            'amount': '-Rp 780.000',
-            'icon': Icons.science_outlined,
-          },
-          {
-            'title': 'Sewa Traktor Lahan Blok A',
-            'date': '02 Jul 2023 • Olah Tanah',
-            'amount': '-Rp 550.000',
-            'icon': Icons.agriculture_rounded,
-          },
-          {
-            'title': 'Bibit Unggul Temanggung',
-            'date': '20 Mei 2023 • 4500 Batang',
-            'amount': '-Rp 1.350.000',
-            'icon': Icons.spa_outlined,
-          },
-        ]);
-    } else if (seasonNum == 1 || lower.contains('pertama') || lower.contains('kesatu') || lower.contains('musim 1')) {
-      _historyItems
-        ..clear()
-        ..addAll([
-          {
-            'title': 'Upah Petik Daun Bawah',
-            'date': '15 Sep 2022 • 7 Pekerja',
-            'amount': '-Rp 950.000',
-            'icon': Icons.groups_rounded,
-          },
-          {
-            'title': 'Pupuk ZA & NPK Daun',
-            'date': '22 Jul 2022 • Toko Tani Maju',
-            'amount': '-Rp 700.000',
-            'icon': Icons.science_outlined,
-          },
-          {
-            'title': 'Sewa Traktor Lahan Blok A',
-            'date': '10 Jun 2022 • Olah Tanah',
-            'amount': '-Rp 500.000',
-            'icon': Icons.agriculture_rounded,
-          },
-          {
-            'title': 'Bibit Unggul Temanggung',
-            'date': '05 Jun 2022 • 4000 Batang',
-            'amount': '-Rp 1.200.000',
-            'icon': Icons.spa_outlined,
-          },
-        ]);
-    } else {
-      _historyItems
-        ..clear()
-        ..addAll([
-          {
-            'title': 'Upah Petik Daun Bawah',
-            'date': '12 Okt 2024 • 8 Pekerja',
-            'amount': '-Rp 1.200.000',
-            'icon': Icons.groups_rounded,
-          },
-          {
-            'title': 'Pupuk ZA & NPK Daun',
-            'date': '08 Okt 2024 • Toko Tani Maju',
-            'amount': '-Rp 850.000',
-            'icon': Icons.science_outlined,
-          },
-          {
-            'title': 'Sewa Traktor Lahan Blok A',
-            'date': '24 Sep 2024 • Olah Tanah',
-            'amount': '-Rp 600.000',
-            'icon': Icons.agriculture_rounded,
-          },
-          {
-            'title': 'Bibit Unggul Temanggung',
-            'date': '18 Sep 2024 • 5000 Batang',
-            'amount': '-Rp 1.500.000',
-            'icon': Icons.spa_outlined,
-          },
-        ]);
-    }
+    _historyItems.clear();
   }
 
   Future<void> _navigateToSelectSeason() async {
@@ -257,192 +313,324 @@ class _FinanceScreenState extends State<FinanceScreen> {
             duration: const Duration(seconds: 2),
           ),
         );
+      } else {
+        _listenToFirestore();
       }
     }
   }
 
-  void _showSeasonSelectionSheet() {
-    final seasons = [
-      {
-        'seasonNumber': 3,
-        'title': 'Musim Ketiga (2024)',
-        'short': 'Musim 3',
-        'period': 'Mei - Okt 2024 • Lahan Blok A & B',
-        'expenses': 'Rp 14.250.000',
-        'harvest': '3.200 kg tembakau',
-        'status': 'Selesai',
-        'labor': 'Rp 6.840.000',
-        'fertilizer': 'Rp 3.847.500',
-        'seed': 'Rp 2.422.500',
-        'other': 'Rp 1.140.000',
-      },
-      {
-        'seasonNumber': 2,
-        'title': 'Musim Kedua (2023)',
-        'short': 'Musim 2',
-        'period': 'Mei - Sep 2023 • Lahan Blok A',
-        'expenses': 'Rp 12.800.000',
-        'harvest': '2.850 kg tembakau',
-        'status': 'Selesai',
-        'labor': 'Rp 6.144.000',
-        'fertilizer': 'Rp 3.456.000',
-        'seed': 'Rp 2.176.000',
-        'other': 'Rp 1.024.000',
-      },
-      {
-        'seasonNumber': 1,
-        'title': 'Musim Pertama (2022)',
-        'short': 'Musim 1',
-        'period': 'Jun - Okt 2022 • Lahan Blok A',
-        'expenses': 'Rp 11.450.000',
-        'harvest': '2.600 kg tembakau',
-        'status': 'Selesai',
-        'labor': 'Rp 5.496.000',
-        'fertilizer': 'Rp 3.091.500',
-        'seed': 'Rp 1.946.500',
-        'other': 'Rp 916.000',
-      },
-    ];
+  Future<void> _showSeasonSelectionSheet() async {
+    List<Map<String, dynamic>> seasons = [];
+    try {
+      final list = await FirestoreService.instance.getSemuaMusim(AuthSession.currentIdPetani);
+      for (final m in list) {
+        final biayaList = await FirestoreService.instance.getDaftarBiaya(AuthSession.currentIdPetani, m.idMusim);
+        double mBuruh = 0.0;
+        double mPupuk = 0.0;
+        double mBibit = 0.0;
+        double mLainnya = 0.0;
+        double mTotal = 0.0;
+
+        for (final b in biayaList) {
+          mTotal += b.jumlahBiaya;
+          switch (b.kodeKategori) {
+            case 'BURUH':
+              mBuruh += b.jumlahBiaya;
+              break;
+            case 'PUPUK':
+              mPupuk += b.jumlahBiaya;
+              break;
+            case 'BIBIT':
+              mBibit += b.jumlahBiaya;
+              break;
+            case 'LAINNYA':
+            default:
+              mLainnya += b.jumlahBiaya;
+              break;
+          }
+        }
+
+        final double seasonTotal = (biayaList.isNotEmpty || mTotal > 0) ? mTotal : m.totalPengeluaranCache;
+
+        final bool isSelesai = m.status == 'SELESAI';
+        seasons.add({
+          'idMusim': m.idMusim,
+          'seasonNumber': m.nomorMusim,
+          'title': m.judulMusim,
+          'short': 'Musim ${m.nomorMusim}',
+          'period': 'Mulai ${m.tanggalMulai.day}/${m.tanggalMulai.month}/${m.tanggalMulai.year} • ${m.lokasiBlok}',
+          'expenses': 'Rp ${_formatAngka(seasonTotal)}',
+          'harvest': '${m.totalBobotPanenCache.toStringAsFixed(0)} kg tembakau',
+          'status': isSelesai ? 'SELESAI' : 'BELUM SELESAI',
+          'isSelesai': isSelesai,
+          'labor': 'Rp ${_formatAngka(mBuruh)}',
+          'fertilizer': 'Rp ${_formatAngka(mPupuk)}',
+          'seed': 'Rp ${_formatAngka(mBibit)}',
+          'other': 'Rp ${_formatAngka(mLainnya)}',
+        });
+      }
+    } catch (_) {}
+
+    if (!mounted) return;
+
+    String activeFilter = 'SEMUA';
 
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(18),
-        decoration: const BoxDecoration(
-          color: AppColors.paper,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-          border: Border(
-            top: BorderSide(color: AppColors.ink, width: 2),
-            left: BorderSide(color: AppColors.ink, width: 2),
-            right: BorderSide(color: AppColors.ink, width: 2),
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          final int countBelum = seasons.where((s) => s['isSelesai'] != true).length;
+          final int countSudah = seasons.where((s) => s['isSelesai'] == true).length;
+
+          final List<Map<String, dynamic>> displayed = seasons.where((s) {
+            if (activeFilter == 'BELUM') return s['isSelesai'] != true;
+            if (activeFilter == 'SUDAH') return s['isSelesai'] == true;
+            return true;
+          }).toList();
+
+          return Container(
+            padding: const EdgeInsets.all(18),
+            decoration: const BoxDecoration(
+              color: AppColors.paper,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              border: Border(
+                top: BorderSide(color: AppColors.ink, width: 2),
+                left: BorderSide(color: AppColors.ink, width: 2),
+                right: BorderSide(color: AppColors.ink, width: 2),
+              ),
+            ),
+            child: SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('PILIH PERIODE MUSIM', style: AppTypography.display(fontSize: 16, fontWeight: FontWeight.w900)),
-                  GestureDetector(
-                    onTap: () => Navigator.pop(ctx),
-                    child: const Icon(Icons.close_rounded, size: 20, color: AppColors.ink),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('PILIH PERIODE MUSIM', style: AppTypography.display(fontSize: 16, fontWeight: FontWeight.w900)),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(ctx),
+                        child: const Icon(Icons.close_rounded, size: 20, color: AppColors.ink),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const MicroText('PILIH MUSIM UNTUK MENAMPILKAN BUKU KAS AKTIF', fontSize: 9, color: AppColors.muted),
+                  const SizedBox(height: 12),
+
+                  // Tab Filter Cepat (Semua, Belum Selesai, Sudah Selesai)
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Row(
+                      children: [
+                        _buildFilterTab(
+                          label: 'SEMUA (${seasons.length})',
+                          isSelected: activeFilter == 'SEMUA',
+                          onTap: () => setSheetState(() => activeFilter = 'SEMUA'),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildFilterTab(
+                          label: 'BELUM SELESAI ($countBelum)',
+                          isSelected: activeFilter == 'BELUM',
+                          activeColor: AppColors.orange,
+                          onTap: () => setSheetState(() => activeFilter = 'BELUM'),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildFilterTab(
+                          label: 'SUDAH SELESAI ($countSudah)',
+                          isSelected: activeFilter == 'SUDAH',
+                          activeColor: AppColors.ink,
+                          onTap: () => setSheetState(() => activeFilter = 'SUDAH'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  if (displayed.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: MicroText(
+                          activeFilter == 'BELUM'
+                              ? 'TIDAK ADA MUSIM YANG BELUM SELESAI'
+                              : activeFilter == 'SUDAH'
+                                  ? 'TIDAK ADA MUSIM YANG SUDAH SELESAI'
+                                  : 'BELUM ADA ARSIP MUSIM LAINNYA',
+                          fontSize: 10,
+                          color: AppColors.muted,
+                        ),
+                      ),
+                    )
+                  else
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(ctx).size.height * 0.55,
+                      ),
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: displayed.map((s) {
+                            final isCurrent = AuthSession.currentIdMusim == s['idMusim'] ||
+                                _currentSeasonTitle.contains(s['short'] as String);
+                            final bool isSelesai = s['isSelesai'] == true;
+
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: InkWell(
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  final idMusim = s['idMusim'] as String? ?? '';
+                                  if (idMusim.isNotEmpty) {
+                                    AuthSession.setActiveMusim(idMusim);
+                                    FirestoreService.instance.setMusimAktif(AuthSession.currentIdPetani, idMusim);
+                                    _subscribeBiaya(AuthSession.currentIdPetani, idMusim);
+                                  }
+                                  setState(() {
+                                    final rawTitle = s['title'] as String? ?? 'Musim ${s['seasonNumber']}';
+                                    _currentSeasonTitle = rawTitle.startsWith('Biaya & Pengeluaran')
+                                        ? rawTitle
+                                        : 'Biaya & Pengeluaran $rawTitle';
+                                    FinanceDataStore.activeSeasonTitle = _currentSeasonTitle;
+                                  });
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Beralih ke: $_currentSeasonTitle'),
+                                      backgroundColor: AppColors.ink,
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: isCurrent ? AppColors.mint : Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isCurrent ? AppColors.forest : AppColors.ink,
+                                      width: isCurrent ? 2 : 1.5,
+                                    ),
+                                    boxShadow: const [BoxShadow(color: AppColors.ink, offset: Offset(2, 2))],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              s['title'] as String,
+                                              style: AppTypography.display(fontSize: 14, fontWeight: FontWeight.w800),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          StatusChip(
+                                            label: isSelesai ? 'SUDAH SELESAI' : 'BELUM SELESAI',
+                                            variant: isSelesai ? StatusChipVariant.dark : StatusChipVariant.orange,
+                                            fontSize: 8.5,
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 3),
+                                      MicroText(s['period'] as String, fontSize: 9.5, color: AppColors.muted),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            s['expenses'] as String,
+                                            style: AppTypography.mono(fontSize: 12, fontWeight: FontWeight.w900),
+                                          ),
+                                          if (isCurrent)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.lime,
+                                                borderRadius: BorderRadius.circular(4),
+                                                border: Border.all(color: AppColors.ink, width: 1.2),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(Icons.check_rounded, size: 12, color: AppColors.ink),
+                                                  const SizedBox(width: 3),
+                                                  MicroText('SEDANG DIBUKA', fontSize: 8.5, fontWeight: FontWeight.w900, color: AppColors.ink),
+                                                ],
+                                              ),
+                                            )
+                                          else
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(Icons.touch_app_outlined, size: 12, color: AppColors.muted),
+                                                const SizedBox(width: 3),
+                                                MicroText('PILIH', fontSize: 9, fontWeight: FontWeight.w800, color: AppColors.muted),
+                                              ],
+                                            ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 10),
+                  TrapezoidTabButton(
+                    label: 'SEMUA ARSIP MUSIM',
+                    icon: Icons.folder_open_outlined,
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _navigateToSelectSeason();
+                    },
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
-              const MicroText('PILIH MUSIM UNTUK MENAMPILKAN BUKU KAS AKTIF', fontSize: 9, color: AppColors.muted),
-              const SizedBox(height: 14),
-              ...seasons.map((s) {
-                final isCurrent = _currentSeasonTitle.contains(s['short'] as String);
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      setState(() {
-                        _applySeasonData(s);
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Beralih ke: $_currentSeasonTitle'),
-                          backgroundColor: AppColors.ink,
-                          duration: const Duration(seconds: 2),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isCurrent ? AppColors.mint : Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isCurrent ? AppColors.limeDeep : AppColors.ink,
-                          width: isCurrent ? 2 : 1.5,
-                        ),
-                        boxShadow: const [BoxShadow(color: AppColors.ink, offset: Offset(2, 2))],
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  s['title'] as String,
-                                  style: AppTypography.display(fontSize: 14, fontWeight: FontWeight.w800),
-                                ),
-                                const SizedBox(height: 2),
-                                MicroText(s['period'] as String, fontSize: 9.5, color: AppColors.muted),
-                              ],
-                            ),
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                s['expenses'] as String,
-                                style: AppTypography.mono(fontSize: 12, fontWeight: FontWeight.w900),
-                              ),
-                              const SizedBox(height: 2),
-                              if (isCurrent)
-                                const StatusChip(label: 'AKTIF', variant: StatusChipVariant.lime)
-                              else
-                                const MicroText('PILIH', fontSize: 9, color: AppColors.muted),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }),
-              const SizedBox(height: 10),
-              TrapezoidTabButton(
-                label: 'SEMUA ARSIP MUSIM',
-                icon: Icons.folder_open_outlined,
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _navigateToSelectSeason();
-                },
-              ),
-            ],
-          ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildFilterTab({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    Color? activeColor,
+  }) {
+    final bg = isSelected ? (activeColor ?? AppColors.ink) : Colors.white;
+    final fg = isSelected ? (activeColor == AppColors.lime ? AppColors.ink : Colors.white) : AppColors.ink;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(5),
+          border: Border.all(color: AppColors.ink, width: 1.3),
+          boxShadow: isSelected
+              ? const [BoxShadow(color: AppColors.ink, offset: Offset(1.5, 1.5))]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: AppTypography.mono(fontSize: 10, fontWeight: FontWeight.w900, color: fg),
         ),
       ),
     );
   }
 
-  final List<Map<String, dynamic>> _historyItems = [
-    {
-      'title': 'Upah Petik Daun Bawah',
-      'date': '12 Okt 2026 • 8 Pekerja',
-      'amount': '-Rp 1.200.000',
-      'icon': Icons.groups_rounded,
-    },
-    {
-      'title': 'Pupuk ZA & NPK Daun',
-      'date': '08 Okt 2026 • Toko Tani Maju',
-      'amount': '-Rp 850.000',
-      'icon': Icons.science_outlined,
-    },
-    {
-      'title': 'Sewa Traktor Lahan Blok A',
-      'date': '24 Sep 2026 • Olah Tanah',
-      'amount': '-Rp 600.000',
-      'icon': Icons.agriculture_rounded,
-    },
-    {
-      'title': 'Bibit Unggul Temanggung',
-      'date': '18 Sep 2026 • 5000 Batang',
-      'amount': '-Rp 1.500.000',
-      'icon': Icons.spa_outlined,
-    },
-  ];
+  final List<Map<String, dynamic>> _historyItems = [];
 
   @override
   Widget build(BuildContext context) {
@@ -520,10 +708,10 @@ class _FinanceScreenState extends State<FinanceScreen> {
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.edit_outlined, size: 14, color: AppColors.ink),
-                            const SizedBox(width: 4),
-                            MicroText('EDIT', fontSize: 10, color: AppColors.ink, fontWeight: FontWeight.w900),
+                          children: const [
+                            Icon(Icons.swap_horiz_rounded, size: 14, color: AppColors.ink),
+                            SizedBox(width: 4),
+                            MicroText('PILIH MUSIM', fontSize: 10, color: AppColors.ink, fontWeight: FontWeight.w900),
                           ],
                         ),
                       ),
@@ -552,13 +740,16 @@ class _FinanceScreenState extends State<FinanceScreen> {
                 TrapezoidTabButton(
                   label: 'TAMBAH CATATAN BIAYA',
                   icon: Icons.add_rounded,
-                  onPressed: () {
-                    Navigator.push(
+                  onPressed: () async {
+                    final res = await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => const FinanceScreenEditUpload(),
                       ),
                     );
+                    if (res == true && mounted) {
+                      _listenToFirestore();
+                    }
                   },
                 ),
               ],
@@ -625,6 +816,14 @@ class _FinanceScreenState extends State<FinanceScreen> {
   }
 
   Widget _buildTotalExpenseCard() {
+    final allCatsZero = _categories.every((c) =>
+        c['amount'] == 'Rp 0' ||
+        c['amount'] == 'Rp 0 jt' ||
+        c['amount'] == 'Rp 0 rb');
+    final displayTotal = (_firestoreBiayaList.isEmpty && allCatsZero)
+        ? 'Rp 0'
+        : _currentTotalExpense;
+
     return RetroCard(
       tapeTag: 'TOTAL BIAYA // ESTIMASI MUSIM TANAM',
       rightTag: '4 POS BIAYA',
@@ -634,7 +833,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
           const MicroText('TOTAL PENGELUARAN TERCATAT', fontSize: 9, color: AppColors.muted),
           const SizedBox(height: 4),
           Text(
-            _currentTotalExpense,
+            displayTotal,
             style: AppTypography.display(
               fontSize: 26,
               fontWeight: FontWeight.w900,
@@ -702,91 +901,147 @@ class _FinanceScreenState extends State<FinanceScreen> {
   }
 
   Widget _buildHistorySection() {
+    final hasFirestore = _firestoreBiayaList.isNotEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const TaperedDivider(centerLabel: 'RIWAYAT PENGELUARAN TERBARU'),
         const SizedBox(height: 6),
-        ..._historyItems.map((item) {
-          return RetroCard(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(10),
-            child: Row(
-              children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: AppColors.ink,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Icon(item['icon'] as IconData, color: AppColors.lime, size: 18),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item['title'] as String,
-                        style: AppTypography.display(fontSize: 13, fontWeight: FontWeight.w800),
-                      ),
-                      Text(
-                        item['date'] as String,
-                        style: AppTypography.mono(fontSize: 9.5, color: AppColors.muted),
-                      ),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      item['amount'] as String,
-                      style: AppTypography.mono(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.red,
-                      ),
+        if (hasFirestore)
+          ..._firestoreBiayaList.map((item) {
+            IconData icon;
+            switch (item.kodeKategori) {
+              case 'BURUH':
+                icon = Icons.groups_rounded;
+                break;
+              case 'PUPUK':
+                icon = Icons.science_outlined;
+                break;
+              case 'BIBIT':
+                icon = Icons.spa_outlined;
+                break;
+              default:
+                icon = Icons.category_outlined;
+            }
+            final dateStr = '${item.tanggal.day} ${_namaBulan(item.tanggal.month)} ${item.tanggal.year}';
+            final amountStr = '-Rp ${_formatAngka(item.jumlahBiaya)}';
+
+            return RetroCard(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(10),
+              child: Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: AppColors.ink,
+                      borderRadius: BorderRadius.circular(6),
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
+                    child: Icon(icon, color: AppColors.lime, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => FinanceScreenEditUpload(
-                                  initialData: {
-                                    'title': item['title'],
-                                    'amount': item['amount'].toString().replaceAll('-Rp ', '').replaceAll('.', ''),
-                                  },
-                                ),
-                              ),
-                            );
-                          },
-                          child: const Icon(Icons.edit_outlined, size: 16, color: AppColors.ink),
+                        Text(
+                          item.namaPengeluaran,
+                          style: AppTypography.display(fontSize: 13, fontWeight: FontWeight.w800),
                         ),
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: () => _confirmDeleteExpense(item['title'] as String),
-                          child: const Icon(Icons.delete_outline_rounded, size: 16, color: AppColors.red),
+                        Text(
+                          '$dateStr • ${item.namaKategoriDisplay}',
+                          style: AppTypography.mono(fontSize: 9.5, color: AppColors.muted),
                         ),
                       ],
                     ),
-                  ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        amountStr,
+                        style: AppTypography.mono(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.red,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          GestureDetector(
+                            onTap: () async {
+                              final res = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => FinanceScreenEditUpload(
+                                    initialData: {
+                                      'idBiaya': item.idBiaya,
+                                      'title': item.namaPengeluaran,
+                                      'amount': item.jumlahBiaya.round().toString(),
+                                      'category': item.namaKategoriDisplay,
+                                      'notes': item.catatan,
+                                    },
+                                  ),
+                                ),
+                              );
+                              if (res == true && mounted) {
+                                _listenToFirestore();
+                              }
+                            },
+                            child: const Icon(Icons.edit_outlined, size: 16, color: AppColors.ink),
+                          ),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () => _confirmDeleteExpense(item.namaPengeluaran, idBiaya: item.idBiaya),
+                            child: const Icon(Icons.delete_outline_rounded, size: 16, color: AppColors.red),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          })
+        else
+          RetroCard(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            child: Column(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.paper,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.ink, width: 1.5),
+                  ),
+                  child: const Icon(Icons.receipt_long_outlined, color: AppColors.muted, size: 24),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'BELUM ADA PENGELUARAN',
+                  style: AppTypography.display(fontSize: 13, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 4),
+                const MicroText(
+                  'Belum ada catatan biaya operasional di musim ini.\nTekan tombol di bawah untuk menambah catatan biaya.',
+                  fontSize: 9.5,
+                  color: AppColors.muted,
                 ),
               ],
             ),
-          );
-        }),
+          ),
       ],
     );
   }
 
-  void _confirmDeleteExpense(String title) {
+  void _confirmDeleteExpense(String title, {String? idBiaya}) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -805,12 +1060,26 @@ class _FinanceScreenState extends State<FinanceScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.red, foregroundColor: Colors.white),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              setState(() => _historyItems.removeWhere((i) => i['title'] == title));
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Catatan "$title" berhasil dihapus!')),
-              );
+              if (idBiaya != null) {
+                try {
+                  await FirestoreService.instance.hapusBiayaSoft(
+                    idPetani: AuthSession.currentIdPetani,
+                    idMusim: AuthSession.currentIdMusim,
+                    idBiaya: idBiaya,
+                  );
+                } catch (_) {}
+              }
+              setState(() {
+                _historyItems.removeWhere((i) => i['title'] == title);
+                _firestoreBiayaList.removeWhere((i) => i.idBiaya == idBiaya);
+              });
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Catatan "$title" berhasil dihapus!')),
+                );
+              }
             },
             child: Text('YA, HAPUS', style: AppTypography.mono(fontSize: 11, fontWeight: FontWeight.w900)),
           ),

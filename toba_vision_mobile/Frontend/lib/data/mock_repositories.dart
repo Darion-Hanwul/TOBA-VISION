@@ -1,4 +1,5 @@
 import '../core/app_config.dart';
+import 'auth_session.dart';
 import 'models.dart';
 import 'repositories.dart';
 
@@ -9,10 +10,10 @@ Future<T> _fake<T>(T value) async {
 
 class MockUserRepository implements UserRepository {
   @override
-  Future<UserProfile> getProfile() => _fake(const UserProfile(
-        name: 'Pak Slamet',
-        group: 'Mitra Poktan Sindoro Makmur',
-        region: 'Lereng Sumbing',
+  Future<UserProfile> getProfile() => _fake(UserProfile(
+        name: AuthSession.currentNama,
+        group: AuthSession.currentKelompok,
+        region: AuthSession.currentLokasi,
       ));
 }
 

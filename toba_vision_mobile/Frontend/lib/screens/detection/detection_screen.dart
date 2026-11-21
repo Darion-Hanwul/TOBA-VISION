@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/theme.dart';
 import '../../widgets/retro/micro_text.dart';
-import '../../widgets/retro/reel_loader.dart';
 import '../../widgets/retro/trapezoid_tab_button.dart';
 
 class DetectionScreen extends StatefulWidget {

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
+import '../../data/auth_session.dart';
+import '../../data/firestore_models.dart';
+import '../../data/firestore_service.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/retro/blade_ornament.dart';
 import '../../widgets/retro/micro_text.dart';
@@ -17,60 +20,115 @@ class HarvestAllMusimScreen extends StatefulWidget {
 }
 
 class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
-  // Data Riwayat Semua Musim Panen Tembakau (Keuntungan Mentah & Siklus 7 Petikan Daun)
-  final List<Map<String, dynamic>> _seasonHistory = [
-    {
-      'title': 'Musim Ketiga (2024)',
-      'period': 'Mei - Okt 2024 • Lahan Blok A & B',
-      'weight': '3.200 kg tembakau',
-      'revenue': 'Rp 88.500.000',
-      'cycles': '7/7 Petikan Selesai',
-      'status': 'Selesai',
-      'stageDetails': [
-        {'stage': 'P1', 'label': 'Daun Pasir (Bawah 1)', 'weight': '450 kg', 'revenue': 'Rp 11.250.000'},
-        {'stage': 'P2', 'label': 'Daun Bawah 2', 'weight': '510 kg', 'revenue': 'Rp 12.750.000'},
-        {'stage': 'P3', 'label': 'Daun Tengah Utama (Prima)', 'weight': '860 kg', 'revenue': 'Rp 27.520.000'},
-        {'stage': 'P4', 'label': 'Daun Tengah 2', 'weight': '620 kg', 'revenue': 'Rp 18.600.000'},
-        {'stage': 'P5', 'label': 'Daun Atas', 'weight': '420 kg', 'revenue': 'Rp 10.920.000'},
-        {'stage': 'P6', 'label': 'Pucuk Daun', 'weight': '230 kg', 'revenue': 'Rp 5.290.000'},
-        {'stage': 'P7', 'label': 'Pemetikan Akhir', 'weight': '110 kg', 'revenue': 'Rp 2.170.000'},
-      ],
-    },
-    {
-      'title': 'Musim Kedua (2023)',
-      'period': 'Mei - Sep 2023 • Lahan Blok A',
-      'weight': '2.850 kg tembakau',
-      'revenue': 'Rp 78.000.000',
-      'cycles': '7/7 Petikan Selesai',
-      'status': 'Selesai',
-      'stageDetails': [
-        {'stage': 'P1', 'label': 'Daun Pasir (Bawah 1)', 'weight': '400 kg', 'revenue': 'Rp 9.600.000'},
-        {'stage': 'P2', 'label': 'Daun Bawah 2', 'weight': '460 kg', 'revenue': 'Rp 11.500.000'},
-        {'stage': 'P3', 'label': 'Daun Tengah Utama (Prima)', 'weight': '780 kg', 'revenue': 'Rp 24.180.000'},
-        {'stage': 'P4', 'label': 'Daun Tengah 2', 'weight': '550 kg', 'revenue': 'Rp 16.500.000'},
-        {'stage': 'P5', 'label': 'Daun Atas', 'weight': '380 kg', 'revenue': 'Rp 9.880.000'},
-        {'stage': 'P6', 'label': 'Pucuk Daun', 'weight': '190 kg', 'revenue': 'Rp 4.370.000'},
-        {'stage': 'P7', 'label': 'Pemetikan Akhir', 'weight': '90 kg', 'revenue': 'Rp 1.970.000'},
-      ],
-    },
-    {
-      'title': 'Musim Pertama (2022)',
-      'period': 'Jun - Okt 2022 • Lahan Blok A',
-      'weight': '2.600 kg tembakau',
-      'revenue': 'Rp 68.600.000',
-      'cycles': '7/7 Petikan Selesai',
-      'status': 'Selesai',
-      'stageDetails': [
-        {'stage': 'P1', 'label': 'Daun Pasir (Bawah 1)', 'weight': '380 kg', 'revenue': 'Rp 8.740.000'},
-        {'stage': 'P2', 'label': 'Daun Bawah 2', 'weight': '420 kg', 'revenue': 'Rp 10.080.000'},
-        {'stage': 'P3', 'label': 'Daun Tengah Utama (Prima)', 'weight': '710 kg', 'revenue': 'Rp 21.300.000'},
-        {'stage': 'P4', 'label': 'Daun Tengah 2', 'weight': '500 kg', 'revenue': 'Rp 14.500.000'},
-        {'stage': 'P5', 'label': 'Daun Atas', 'weight': '350 kg', 'revenue': 'Rp 8.750.000'},
-        {'stage': 'P6', 'label': 'Pucuk Daun', 'weight': '160 kg', 'revenue': 'Rp 3.520.000'},
-        {'stage': 'P7', 'label': 'Pemetikan Akhir', 'weight': '80 kg', 'revenue': 'Rp 1.710.000'},
-      ],
-    },
-  ];
+  double _totalAccumulatedKg = 0.0;
+  double _totalAccumulatedRev = 0.0;
+  int _totalMusimSelesai = 0;
+  int _totalMusimCount = 0;
+  final List<Map<String, dynamic>> _seasonHistory = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMusimPanenFromFirestore();
+  }
+
+  Future<void> _loadMusimPanenFromFirestore() async {
+    try {
+      final list = await FirestoreService.instance.getSemuaMusim(AuthSession.currentIdPetani);
+      if (!mounted) return;
+
+      double totalKg = 0.0;
+      double totalRev = 0.0;
+      int selesai = 0;
+      final List<Map<String, dynamic>> loadedHistory = [];
+
+      for (final m in list) {
+        totalKg += m.totalBobotPanenCache;
+        totalRev += m.totalPendapatanCache;
+        if (m.status == 'SELESAI') selesai++;
+
+        final petikanList = await FirestoreService.instance.getDaftarPetikan(AuthSession.currentIdPetani, m.idMusim);
+        final Map<String, PetikanPanenModel> petikanMap = {};
+        for (final p in petikanList) {
+          petikanMap[p.kodeSiklus] = p;
+        }
+
+        final stageDetails = [
+          {
+            'stage': 'P1',
+            'label': 'Daun Pasir (Bawah 1)',
+            'weight': '${petikanMap['P1']?.beratKg.round() ?? 0} kg',
+            'revenue': 'Rp ${_formatAngka(petikanMap['P1']?.estimasiPendapatan ?? 0.0)}',
+          },
+          {
+            'stage': 'P2',
+            'label': 'Daun Bawah 2',
+            'weight': '${petikanMap['P2']?.beratKg.round() ?? 0} kg',
+            'revenue': 'Rp ${_formatAngka(petikanMap['P2']?.estimasiPendapatan ?? 0.0)}',
+          },
+          {
+            'stage': 'P3',
+            'label': 'Daun Tengah Utama (Prima)',
+            'weight': '${petikanMap['P3']?.beratKg.round() ?? 0} kg',
+            'revenue': 'Rp ${_formatAngka(petikanMap['P3']?.estimasiPendapatan ?? 0.0)}',
+          },
+          {
+            'stage': 'P4',
+            'label': 'Daun Tengah 2',
+            'weight': '${petikanMap['P4']?.beratKg.round() ?? 0} kg',
+            'revenue': 'Rp ${_formatAngka(petikanMap['P4']?.estimasiPendapatan ?? 0.0)}',
+          },
+          {
+            'stage': 'P5',
+            'label': 'Daun Atas',
+            'weight': '${petikanMap['P5']?.beratKg.round() ?? 0} kg',
+            'revenue': 'Rp ${_formatAngka(petikanMap['P5']?.estimasiPendapatan ?? 0.0)}',
+          },
+          {
+            'stage': 'P6',
+            'label': 'Pucuk Daun',
+            'weight': '${petikanMap['P6']?.beratKg.round() ?? 0} kg',
+            'revenue': 'Rp ${_formatAngka(petikanMap['P6']?.estimasiPendapatan ?? 0.0)}',
+          },
+          {
+            'stage': 'P7',
+            'label': 'Pemetikan Akhir',
+            'weight': '${petikanMap['P7']?.beratKg.round() ?? 0} kg',
+            'revenue': 'Rp ${_formatAngka(petikanMap['P7']?.estimasiPendapatan ?? 0.0)}',
+          },
+        ];
+
+        loadedHistory.add({
+          'idMusim': m.idMusim,
+          'seasonNumber': m.nomorMusim,
+          'title': m.judulMusim,
+          'period': 'Mulai ${m.tanggalMulai.day}/${m.tanggalMulai.month}/${m.tanggalMulai.year} • ${m.lokasiBlok}',
+          'weight': '${m.totalBobotPanenCache.round()} kg tembakau',
+          'revenue': 'Rp ${_formatAngka(m.totalPendapatanCache)}',
+          'cycles': m.status == 'SELESAI' ? '7/7 Petikan Selesai' : '${petikanList.length}/7 Petikan Terdata',
+          'status': m.status == 'SELESAI' ? 'Sudah Selesai' : 'Belum Selesai',
+          'stageDetails': stageDetails,
+        });
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _seasonHistory.clear();
+        _seasonHistory.addAll(loadedHistory);
+        _totalAccumulatedKg = totalKg;
+        _totalAccumulatedRev = totalRev;
+        _totalMusimSelesai = selesai;
+        _totalMusimCount = list.length;
+      });
+    } catch (_) {}
+  }
+
+  String _formatAngka(double val) {
+    final intVal = val.round();
+    final s = intVal.toString();
+    final reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+    return s.replaceAllMapped(reg, (Match m) => '${m[1]}.');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,13 +153,16 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
                   height: null,
                   trailing: AppHeaderActionButton(
                     icon: Icons.sync_rounded,
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Sinkronisasi data panen semua musim berhasil diperbarui!'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
+                    onTap: () async {
+                      await _loadMusimPanenFromFirestore();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Sinkronisasi data panen semua musim berhasil diperbarui!'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
                     },
                   ),
                 ),
@@ -125,7 +186,7 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
   Widget _buildAccumulatedHeaderCard() {
     return RetroCard(
       tapeTag: 'TOTAL AKUMULASI // REKAP PANEN',
-      rightTag: '3 MUSIM SELESAI',
+      rightTag: '$_totalMusimSelesai MUSIM SELESAI',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -157,12 +218,12 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              StatusChip.dark('3 MUSIM SELESAI'),
+              StatusChip.dark('$_totalMusimSelesai MUSIM SELESAI'),
             ],
           ),
           const SizedBox(height: 12),
           Text(
-            '8.650 kg',
+            '${_formatAngka(_totalAccumulatedKg)} kg',
             style: AppTypography.display(
               size: 34,
               weight: FontWeight.w900,
@@ -183,7 +244,7 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'Total Keuntungan Kotor Mentah: Rp 235.100.000',
+                    'Total Nilai Kotor Mentah: Rp ${_formatAngka(_totalAccumulatedRev)}',
                     style: AppTypography.mono(
                       size: 11.5,
                       weight: FontWeight.w700,
@@ -196,7 +257,7 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
           ),
           const SizedBox(height: 8),
           MicroText.regular(
-            'Akumulasi dari 21 kali siklus pemetikan daun tembakau (7 petikan per musim tanam).',
+            'Akumulasi dari $_totalMusimCount musim panen tembakau yang tercatat.',
             color: AppColors.ink.withValues(alpha: 0.7),
             size: 10.5,
           ),
@@ -238,55 +299,90 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _seasonHistory.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final season = _seasonHistory[index];
-            return RetroCard(
-              tapeTag: season['title'] as String,
-              rightTag: season['status'] as String,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          season['title'] as String,
-                          style: AppTypography.display(
-                            size: 15,
-                            weight: FontWeight.w800,
-                            color: AppColors.ink,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.lime,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: AppColors.ink, width: 1.2),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.check_circle_rounded, size: 12, color: AppColors.ink),
-                            const SizedBox(width: 4),
-                            MicroText.bold(
-                              season['status'] as String,
-                              size: 9.5,
+        if (_seasonHistory.isEmpty)
+          RetroCard(
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            child: Column(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.paper,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.ink, width: 1.5),
+                  ),
+                  child: const Icon(Icons.agriculture_rounded, color: AppColors.muted, size: 24),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'BELUM ADA ARSIP PANEN',
+                  style: AppTypography.display(size: 13, weight: FontWeight.w900),
+                ),
+                const SizedBox(height: 4),
+                const MicroText(
+                  'Belum ada riwayat musim tanam terdahulu yang ditutup.\nData hasil panen akan tersimpan di sini saat siklus ditutup.',
+                  fontSize: 9.5,
+                  color: AppColors.muted,
+                ),
+              ],
+            ),
+          )
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _seasonHistory.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final season = _seasonHistory[index];
+              final isSelesai = season['status'] == 'Sudah Selesai' || season['status'] == 'Selesai' || season['status'] == 'SELESAI';
+              return RetroCard(
+                tapeTag: season['title'] as String,
+                rightTag: season['status'] as String,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            season['title'] as String,
+                            style: AppTypography.display(
+                              size: 15,
+                              weight: FontWeight.w800,
                               color: AppColors.ink,
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isSelesai ? AppColors.lime : AppColors.orange,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: AppColors.ink, width: 1.2),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isSelesai ? Icons.check_circle_rounded : Icons.timelapse_rounded,
+                                size: 12,
+                                color: isSelesai ? AppColors.ink : Colors.white,
+                              ),
+                              const SizedBox(width: 4),
+                              MicroText.bold(
+                                season['status'] as String,
+                                size: 9.5,
+                                color: isSelesai ? AppColors.ink : Colors.white,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   const SizedBox(height: 4),
                   MicroText.regular(
                     season['period'] as String,
@@ -346,8 +442,13 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
                           Icons.edit_outlined,
                           AppColors.lime,
                           () {
+                            final idMusim = season['idMusim'] as String?;
+                            if (idMusim != null && idMusim.isNotEmpty) {
+                              AuthSession.setActiveMusim(idMusim);
+                              FirestoreService.instance.setMusimAktif(AuthSession.currentIdPetani, idMusim);
+                            }
                             if (Navigator.canPop(context)) {
-                              Navigator.pop(context);
+                              Navigator.pop(context, season);
                             } else {
                               Navigator.pushReplacement(
                                 context,
@@ -636,20 +737,44 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
               ),
               elevation: 0,
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              final deletedTitle = season['title'];
-              setState(() => _seasonHistory.removeAt(index));
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Data "$deletedTitle" berhasil dihapus!',
-                    style: AppTypography.mono(size: 12, color: Colors.white),
+              final deletedTitle = season['title'] ?? 'Musim';
+              final idMusim = season['idMusim'] as String? ?? '';
+              final idPetani = AuthSession.currentIdPetani;
+
+              if (idMusim.isNotEmpty && idPetani.isNotEmpty) {
+                final newMusim = await FirestoreService.instance.hapusMusimTanam(
+                  idPetani: idPetani,
+                  idMusim: idMusim,
+                );
+                if (newMusim != null) {
+                  AuthSession.activeMusimId = newMusim.idMusim;
+                } else if (AuthSession.activeMusimId == idMusim) {
+                  final sisa = await FirestoreService.instance.getSemuaMusim(idPetani);
+                  if (sisa.isNotEmpty) {
+                    AuthSession.activeMusimId = sisa.first.idMusim;
+                  } else {
+                    final fresh = await FirestoreService.instance.getOrCreateMusimAktif(idPetani);
+                    AuthSession.activeMusimId = fresh.idMusim;
+                  }
+                }
+              }
+
+              await _loadMusimPanenFromFirestore();
+
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Musim "$deletedTitle" berhasil dihapus dari panen & keuangan!',
+                      style: AppTypography.mono(size: 12, color: Colors.white),
+                    ),
+                    backgroundColor: AppColors.ink,
+                    duration: const Duration(seconds: 2),
                   ),
-                  backgroundColor: AppColors.ink,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
+                );
+              }
             },
             child: Text(
               'Ya, Hapus',

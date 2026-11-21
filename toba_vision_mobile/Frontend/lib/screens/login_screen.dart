@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
+import '../data/auth_session.dart';
+import '../data/firestore_service.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/retro/blade_ornament.dart';
 import '../widgets/retro/chrome_wordmark.dart';
@@ -19,23 +21,112 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _nameController = TextEditingController(text: 'Slamet Raharjo');
+  final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _identifierController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  void _handleLogin() {
-    // Mode Slicing: Langsung navigasi ke HomeScreen (Shell) tanpa cek input
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const Shell()),
-    );
+  Future<void> _handleLogin() async {
+    final identifier = _identifierController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (identifier.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Silakan masukkan Nama Petani atau Username!'),
+          backgroundColor: AppColors.rust,
+        ),
+      );
+      return;
+    }
+
+    if (password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Silakan masukkan Kata Sandi Anda!'),
+          backgroundColor: AppColors.rust,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      // Pastikan demo data sudah ada jika login menggunakan akun demo
+      if (identifier == 'Slamet Raharjo' ||
+          identifier == 'slamet_raharjo' ||
+          identifier == '081234567890') {
+        try {
+          await FirestoreService.instance.inisialisasiDataAwalDemo();
+        } catch (_) {}
+      }
+
+      var petani = await FirestoreService.instance.loginPetani(
+        identifier: identifier,
+        password: password,
+      );
+
+      if (petani != null) {
+        AuthSession.setSession(petani);
+        try {
+          final musim = await FirestoreService.instance.getOrCreateMusimAktif(petani.idPetani);
+          AuthSession.activeMusimId = musim.idMusim;
+        } catch (_) {}
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Selamat datang kembali, ${petani.nama}!'),
+              backgroundColor: AppColors.forestGreen,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const Shell()),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Nama Petani / Username "$identifier" tidak ditemukan!'),
+              backgroundColor: AppColors.rust,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        if (e.toString().contains('KATA_SANDI_SALAH')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Kata sandi salah! Mohon periksa kembali kata sandi Anda.'),
+              backgroundColor: AppColors.rust,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Koneksi bermasalah: $e'),
+              backgroundColor: AppColors.orange,
+            ),
+          );
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -119,8 +210,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Field 1: Nama Lengkap
-                      const MicroText('NAMA LENGKAP / AKUN PETANI', fontSize: 10),
+                      // Field 1: Nama Lengkap / Username Petani (ID Unik)
+                      const MicroText('NAMA PETANI / USERNAME (ID UNIK)', fontSize: 10),
                       const SizedBox(height: 6),
                       Container(
                         decoration: BoxDecoration(
@@ -129,14 +220,14 @@ class _LoginScreenState extends State<LoginScreen> {
                           border: Border.all(color: AppColors.ink, width: 2),
                         ),
                         child: TextField(
-                          controller: _nameController,
+                          controller: _identifierController,
                           textInputAction: TextInputAction.next,
-                          style: AppTypography.body(fontSize: 14, fontWeight: FontWeight.w700),
+                          style: AppTypography.mono(fontSize: 14, fontWeight: FontWeight.w700),
                           decoration: const InputDecoration(
                             border: InputBorder.none,
                             prefixIcon: Icon(Icons.person_outline_rounded, color: AppColors.ink, size: 20),
                             contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                            hintText: 'Nama Petani',
+                            hintText: 'Contoh: Slamet Raharjo',
                           ),
                         ),
                       ),
@@ -173,6 +264,28 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.paper,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: AppColors.ink, width: 1),
+                        ),
+                        child: Row(
+                          children: const [
+                            Icon(Icons.info_outline_rounded, size: 12, color: AppColors.muted),
+                            SizedBox(width: 4),
+                            Expanded(
+                              child: MicroText(
+                                'DEMO PETANI: Slamet Raharjo | SANDI: 123456',
+                                fontSize: 8.5,
+                                color: AppColors.muted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -180,8 +293,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 // 5. Tombol CTA Trapesium Oranye
                 TrapezoidTabButton(
-                  label: 'MASUK KE KEBUN',
-                  onPressed: _handleLogin,
+                  label: _isLoading ? 'MEMERIKSA DATA...' : 'MASUK KE KEBUN',
+                  isLoading: _isLoading,
+                  onPressed: _isLoading ? null : _handleLogin,
                 ),
                 const SizedBox(height: 16),
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
+import '../../data/auth_session.dart';
+import '../../data/firestore_service.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/retro/blade_ornament.dart';
 import '../../widgets/retro/micro_text.dart';
@@ -17,44 +19,104 @@ class FinanceAllMusimScreen extends StatefulWidget {
 }
 
 class _FinanceAllMusimScreenState extends State<FinanceAllMusimScreen> {
-  final List<Map<String, dynamic>> _seasonHistory = [
-    {
-      'seasonNumber': 3,
-      'title': 'Musim Ketiga (2024)',
-      'period': 'Mei - Okt 2024 • Lahan Blok A & B',
-      'expenses': 'Rp 14.250.000',
-      'harvest': '3.200 kg tembakau',
-      'status': 'Selesai',
-      'labor': 'Rp 6.840.000',
-      'fertilizer': 'Rp 3.847.500',
-      'seed': 'Rp 2.422.500',
-      'other': 'Rp 1.140.000',
-    },
-    {
-      'seasonNumber': 2,
-      'title': 'Musim Kedua (2023)',
-      'period': 'Mei - Sep 2023 • Lahan Blok A',
-      'expenses': 'Rp 12.800.000',
-      'harvest': '2.850 kg tembakau',
-      'status': 'Selesai',
-      'labor': 'Rp 6.144.000',
-      'fertilizer': 'Rp 3.456.000',
-      'seed': 'Rp 2.176.000',
-      'other': 'Rp 1.024.000',
-    },
-    {
-      'seasonNumber': 1,
-      'title': 'Musim Pertama (2022)',
-      'period': 'Jun - Okt 2022 • Lahan Blok A',
-      'expenses': 'Rp 11.450.000',
-      'harvest': '2.600 kg tembakau',
-      'status': 'Selesai',
-      'labor': 'Rp 5.496.000',
-      'fertilizer': 'Rp 3.091.500',
-      'seed': 'Rp 1.946.500',
-      'other': 'Rp 916.000',
-    },
-  ];
+  String _totalAccumulated = 'Rp 0';
+  double _totalBuruh = 0;
+  double _totalPupuk = 0;
+  double _totalBibit = 0;
+  double _totalLainnya = 0;
+  int _totalMusimCount = 0;
+  final List<Map<String, dynamic>> _seasonHistory = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMusimFromFirestore();
+  }
+
+  Future<void> _loadMusimFromFirestore() async {
+    try {
+      final list = await FirestoreService.instance.getSemuaMusim(AuthSession.currentIdPetani);
+      if (!mounted) return;
+
+      double totalSemua = 0.0;
+      double buruhSemua = 0.0;
+      double pupukSemua = 0.0;
+      double bibitSemua = 0.0;
+      double lainnyaSemua = 0.0;
+      final List<Map<String, dynamic>> loadedHistory = [];
+
+      for (final m in list) {
+        // Ambil data pengeluaran asli per kategori dari subkoleksi biaya_operasional
+        final biayaList = await FirestoreService.instance.getDaftarBiaya(AuthSession.currentIdPetani, m.idMusim);
+
+        double mBuruh = 0.0;
+        double mPupuk = 0.0;
+        double mBibit = 0.0;
+        double mLainnya = 0.0;
+        double mTotal = 0.0;
+
+        for (final b in biayaList) {
+          mTotal += b.jumlahBiaya;
+          switch (b.kodeKategori) {
+            case 'BURUH':
+              mBuruh += b.jumlahBiaya;
+              break;
+            case 'PUPUK':
+              mPupuk += b.jumlahBiaya;
+              break;
+            case 'BIBIT':
+              mBibit += b.jumlahBiaya;
+              break;
+            case 'LAINNYA':
+            default:
+              mLainnya += b.jumlahBiaya;
+              break;
+          }
+        }
+
+        final double seasonTotal = (biayaList.isNotEmpty || mTotal > 0) ? mTotal : m.totalPengeluaranCache;
+
+        totalSemua += seasonTotal;
+        buruhSemua += mBuruh;
+        pupukSemua += mPupuk;
+        bibitSemua += mBibit;
+        lainnyaSemua += mLainnya;
+
+        loadedHistory.add({
+          'idMusim': m.idMusim,
+          'seasonNumber': m.nomorMusim,
+          'title': m.judulMusim,
+          'period': 'Mulai ${m.tanggalMulai.day}/${m.tanggalMulai.month}/${m.tanggalMulai.year} • ${m.lokasiBlok}',
+          'expenses': 'Rp ${_formatAngka(seasonTotal)}',
+          'harvest': '${m.totalBobotPanenCache.toStringAsFixed(0)} kg tembakau',
+          'status': m.status == 'SELESAI' ? 'Sudah Selesai' : 'Belum Selesai',
+          'labor': 'Rp ${_formatAngka(mBuruh)}',
+          'fertilizer': 'Rp ${_formatAngka(mPupuk)}',
+          'seed': 'Rp ${_formatAngka(mBibit)}',
+          'other': 'Rp ${_formatAngka(mLainnya)}',
+        });
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _seasonHistory.clear();
+        _seasonHistory.addAll(loadedHistory);
+        _totalMusimCount = list.length;
+        _totalAccumulated = 'Rp ${_formatAngka(totalSemua)}';
+        _totalBuruh = buruhSemua;
+        _totalPupuk = pupukSemua;
+        _totalBibit = bibitSemua;
+        _totalLainnya = lainnyaSemua;
+      });
+    } catch (_) {}
+  }
+
+  String _formatAngka(double val) {
+    final intVal = val.round();
+    final s = intVal.toString();
+    final reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+    return s.replaceAllMapped(reg, (Match m) => '${m[1]}.');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,13 +141,16 @@ class _FinanceAllMusimScreenState extends State<FinanceAllMusimScreen> {
                   height: null,
                   trailing: AppHeaderActionButton(
                     icon: Icons.sync_rounded,
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Sinkronisasi data semua musim berhasil diperbarui!'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
+                    onTap: () async {
+                      await _loadMusimFromFirestore();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Sinkronisasi data semua musim berhasil diperbarui!'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
                     },
                   ),
                 ),
@@ -107,7 +172,7 @@ class _FinanceAllMusimScreenState extends State<FinanceAllMusimScreen> {
 
   Widget _buildAccumulatedHeaderCard() {
     return RetroCard(
-      tapeTag: 'TOTAL AKUMULASI // 3 MUSIM TANAM',
+      tapeTag: 'TOTAL AKUMULASI // $_totalMusimCount MUSIM TANAM',
       rightTag: 'ARSIP KAS',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -115,7 +180,7 @@ class _FinanceAllMusimScreenState extends State<FinanceAllMusimScreen> {
           const MicroText('TOTAL AKUMULASI BIAYA', fontSize: 9.5, color: AppColors.muted),
           const SizedBox(height: 4),
           Text(
-            'Rp 38.500.000',
+            _totalAccumulated,
             style: AppTypography.display(
               fontSize: 26,
               fontWeight: FontWeight.w900,
@@ -130,11 +195,11 @@ class _FinanceAllMusimScreenState extends State<FinanceAllMusimScreen> {
           Row(
             children: [
               Expanded(
-                child: _buildSmallCategoryPill('Buruh & Petik', 'Rp 18.500.000', AppColors.forest),
+                child: _buildSmallCategoryPill('Buruh & Petik', 'Rp ${_formatAngka(_totalBuruh)}', AppColors.forest),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: _buildSmallCategoryPill('Pupuk & Nutrisi', 'Rp 10.400.000', AppColors.limeDeep),
+                child: _buildSmallCategoryPill('Pupuk & Nutrisi', 'Rp ${_formatAngka(_totalPupuk)}', AppColors.limeDeep),
               ),
             ],
           ),
@@ -142,11 +207,11 @@ class _FinanceAllMusimScreenState extends State<FinanceAllMusimScreen> {
           Row(
             children: [
               Expanded(
-                child: _buildSmallCategoryPill('Bibit & Olah', 'Rp 6.500.000', AppColors.orange),
+                child: _buildSmallCategoryPill('Bibit & Olah', 'Rp ${_formatAngka(_totalBibit)}', AppColors.orange),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: _buildSmallCategoryPill('Lainnya/Alat', 'Rp 3.100.000', AppColors.ink),
+                child: _buildSmallCategoryPill('Lainnya/Alat', 'Rp ${_formatAngka(_totalLainnya)}', AppColors.ink),
               ),
             ],
           ),
@@ -180,31 +245,68 @@ class _FinanceAllMusimScreenState extends State<FinanceAllMusimScreen> {
       children: [
         const TaperedDivider(centerLabel: 'RIWAYAT MUSIM TANAM // ARSIP'),
         const SizedBox(height: 6),
-
-        ..._seasonHistory.asMap().entries.map((entry) {
-          final index = entry.key;
-          final season = entry.value;
-
-          return RetroCard(
-            tapeTag: 'ARSIP TAHUNAN // REKAP',
-            rightTag: season['status'] as String,
-            margin: const EdgeInsets.only(bottom: 10),
+        if (_seasonHistory.isEmpty)
+          RetroCard(
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      season['title'] as String,
-                      style: AppTypography.display(fontSize: 14, fontWeight: FontWeight.w900),
-                    ),
-                    const StatusChip(label: 'SELESAI', variant: StatusChipVariant.lime, fontSize: 8),
-                  ],
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.paper,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.ink, width: 1.5),
+                  ),
+                  child: const Icon(Icons.account_balance_wallet_outlined, color: AppColors.muted, size: 24),
                 ),
-                const SizedBox(height: 2),
-                MicroText(season['period'] as String, fontSize: 9.5, color: AppColors.muted),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
+                Text(
+                  'BELUM ADA ARSIP KEUANGAN',
+                  style: AppTypography.display(fontSize: 13, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 4),
+                const MicroText(
+                  'Belum ada riwayat musim tanam terdahulu.\nData rekap kas akan diarsipkan saat buku siklus musim ditutup.',
+                  fontSize: 9.5,
+                  color: AppColors.muted,
+                ),
+              ],
+            ),
+          )
+        else
+          ..._seasonHistory.asMap().entries.map((entry) {
+            final index = entry.key;
+            final season = entry.value;
+            final isSelesai = season['status'] == 'SELESAI' || season['status'] == 'Selesai';
+
+            return RetroCard(
+              tapeTag: 'ARSIP TAHUNAN // REKAP',
+              rightTag: season['status'] as String,
+              margin: const EdgeInsets.only(bottom: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          season['title'] as String,
+                          style: AppTypography.display(fontSize: 14, fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      StatusChip(
+                        label: isSelesai ? 'SUDAH SELESAI' : 'BELUM SELESAI',
+                        variant: isSelesai ? StatusChipVariant.dark : StatusChipVariant.orange,
+                        fontSize: 8.5,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  MicroText(season['period'] as String, fontSize: 9.5, color: AppColors.muted),
+                  const SizedBox(height: 8),
 
                 Row(
                   children: [
@@ -267,6 +369,11 @@ class _FinanceAllMusimScreenState extends State<FinanceAllMusimScreen> {
   }
 
   void _applyAndReturnSeason(Map<String, dynamic> season) {
+    final idMusim = season['idMusim'] as String?;
+    if (idMusim != null && idMusim.isNotEmpty) {
+      AuthSession.setActiveMusim(idMusim);
+      FirestoreService.instance.setMusimAktif(AuthSession.currentIdPetani, idMusim);
+    }
     FinanceDataStore.activeSeasonData = season;
     final seasonNum = season['seasonNumber'] as int?;
     final rawTitle = season['title'] as String? ?? '';
@@ -339,20 +446,20 @@ class _FinanceAllMusimScreenState extends State<FinanceAllMusimScreen> {
                 const SizedBox(height: 14),
 
                 // 4 Kategori Rincian Biaya Musim (Format Baris Tanpa Persen)
-                _buildDetailRow('Buruh & Petik:', (season['labor'] ?? 'Rp 6.840.000') as String),
+                _buildDetailRow('Buruh & Petik:', (season['labor'] ?? 'Rp 0') as String),
                 const SizedBox(height: 8),
-                _buildDetailRow('Pupuk & Nutrisi:', (season['fertilizer'] ?? 'Rp 3.847.500') as String),
+                _buildDetailRow('Pupuk & Nutrisi:', (season['fertilizer'] ?? 'Rp 0') as String),
                 const SizedBox(height: 8),
-                _buildDetailRow('Bibit & Olah Lahan:', (season['seed'] ?? 'Rp 2.422.500') as String),
+                _buildDetailRow('Bibit & Olah Lahan:', (season['seed'] ?? 'Rp 0') as String),
                 const SizedBox(height: 8),
-                _buildDetailRow('Lainnya / Tambahan:', (season['other'] ?? 'Rp 1.140.000') as String),
+                _buildDetailRow('Lainnya / Tambahan:', (season['other'] ?? 'Rp 0') as String),
                 const SizedBox(height: 10),
                 Container(
                   height: 1.5,
                   color: AppColors.ink.withValues(alpha: 0.15),
                 ),
                 const SizedBox(height: 8),
-                _buildDetailRow('Total Pengeluaran:', season['expenses'] as String),
+                _buildDetailRow('Total Pengeluaran:', (season['expenses'] ?? 'Rp 0') as String),
                 const SizedBox(height: 18),
                 TrapezoidTabButton(
                   label: 'TUTUP',
@@ -398,13 +505,41 @@ class _FinanceAllMusimScreenState extends State<FinanceAllMusimScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.red, foregroundColor: Colors.white),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              final deletedTitle = season['title'];
-              setState(() => _seasonHistory.removeAt(index));
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Arsip "$deletedTitle" berhasil dihapus!')),
-              );
+              final deletedTitle = season['title'] ?? 'Musim';
+              final idMusim = season['idMusim'] as String? ?? '';
+              final idPetani = AuthSession.currentIdPetani;
+
+              if (idMusim.isNotEmpty && idPetani.isNotEmpty) {
+                final newMusim = await FirestoreService.instance.hapusMusimTanam(
+                  idPetani: idPetani,
+                  idMusim: idMusim,
+                );
+                if (newMusim != null) {
+                  AuthSession.activeMusimId = newMusim.idMusim;
+                } else if (AuthSession.activeMusimId == idMusim) {
+                  final sisa = await FirestoreService.instance.getSemuaMusim(idPetani);
+                  if (sisa.isNotEmpty) {
+                    AuthSession.activeMusimId = sisa.first.idMusim;
+                  } else {
+                    final fresh = await FirestoreService.instance.getOrCreateMusimAktif(idPetani);
+                    AuthSession.activeMusimId = fresh.idMusim;
+                  }
+                }
+              }
+
+              await _loadMusimFromFirestore();
+
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Musim "$deletedTitle" berhasil dihapus dari keuangan & panen!'),
+                    backgroundColor: AppColors.ink,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
             },
             child: Text('YA, HAPUS', style: AppTypography.mono(fontSize: 11, fontWeight: FontWeight.w900)),
           ),

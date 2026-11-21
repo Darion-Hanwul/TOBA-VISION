@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
+import '../../data/auth_session.dart';
+import '../../data/firestore_service.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/retro/blade_ornament.dart';
 import '../../widgets/retro/micro_text.dart';
@@ -10,11 +12,19 @@ import '../../widgets/retro/trapezoid_tab_button.dart';
 class HarvestEditScreen extends StatefulWidget {
   final int initialStep;
   final String stageName;
+  final int maxUnlockedStep;
+  final String? initialWeight;
+  final String? initialRevenue;
+  final String? initialNote;
 
   const HarvestEditScreen({
     super.key,
     required this.initialStep,
     required this.stageName,
+    this.maxUnlockedStep = 7,
+    this.initialWeight,
+    this.initialRevenue,
+    this.initialNote,
   });
 
   @override
@@ -26,37 +36,71 @@ class _HarvestEditScreenState extends State<HarvestEditScreen> {
   late TextEditingController _weightController;
   late TextEditingController _revenueController;
   late TextEditingController _noteController;
+  late DateTime _selectedDate;
+  bool _isSaving = false;
 
   final List<String> _stages = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7'];
 
-  final Map<int, Map<String, String>> _stageDefaults = {
-    1: {'weight': '480', 'rev': '38.400.000', 'note': 'Petikan daun pasir / bawah pertama'},
-    2: {'weight': '520', 'rev': '42.000.000', 'note': 'Petikan daun bawah kedua'},
-    3: {'weight': '850', 'rev': '68.600.000', 'note': 'Petikan daun tengah utama (kualitas prima)'},
-    4: {'weight': '600', 'rev': '48.000.000', 'note': 'Petikan daun tengah kedua'},
-    5: {'weight': '450', 'rev': '36.000.000', 'note': 'Petikan daun atas'},
-    6: {'weight': '320', 'rev': '25.600.000', 'note': 'Petikan pucuk daun'},
-    7: {'weight': '200', 'rev': '16.000.000', 'note': 'Petikan akhir / pembersihan'},
+  static const Map<int, String> _stageDescriptions = {
+    1: 'Petikan daun pasir / bawah pertama',
+    2: 'Petikan daun bawah kedua',
+    3: 'Petikan daun tengah utama (kualitas prima)',
+    4: 'Petikan daun tengah kedua',
+    5: 'Petikan daun atas',
+    6: 'Petikan pucuk daun',
+    7: 'Petikan akhir / pembersihan',
   };
 
   @override
   void initState() {
     super.initState();
     _currentStep = widget.initialStep;
-    final defaultData = _stageDefaults[_currentStep] ?? {'weight': '850', 'rev': '68.600.000', 'note': ''};
+    _weightController = TextEditingController(text: widget.initialWeight ?? '');
+    _revenueController = TextEditingController(text: widget.initialRevenue ?? '');
+    _noteController = TextEditingController(text: widget.initialNote ?? '');
+    _selectedDate = DateTime.now();
+  }
 
-    _weightController = TextEditingController(text: defaultData['weight']);
-    _revenueController = TextEditingController(text: defaultData['rev']);
-    _noteController = TextEditingController(text: defaultData['note']);
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (picked != null) {
+      setState(() => _selectedDate = picked);
+    }
   }
 
   void _onSelectStep(int step) {
+    if (step > widget.maxUnlockedStep) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.lock_rounded, color: Colors.white, size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Petikan P$step masih terkunci! Selesaikan petikan P${widget.maxUnlockedStep} terlebih dahulu.',
+                  style: AppTypography.mono(fontSize: 11, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: AppColors.ink,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
     setState(() {
       _currentStep = step;
-      final defaultData = _stageDefaults[_currentStep] ?? {'weight': '0', 'rev': '0', 'note': ''};
-      _weightController.text = defaultData['weight']!;
-      _revenueController.text = defaultData['rev']!;
-      _noteController.text = defaultData['note']!;
+      _weightController.clear();
+      _revenueController.clear();
+      _noteController.clear();
     });
   }
 
@@ -66,6 +110,50 @@ class _HarvestEditScreenState extends State<HarvestEditScreen> {
     _revenueController.dispose();
     _noteController.dispose();
     super.dispose();
+  }
+
+  Future<void> _saveHarvestPetikan(String stageLabel) async {
+    final weight = double.tryParse(_weightController.text.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
+    final revenue = double.tryParse(_revenueController.text.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
+    final note = _noteController.text.trim();
+    final stageCode = _stages[_currentStep - 1];
+
+    setState(() => _isSaving = true);
+
+    try {
+      await FirestoreService.instance.simpanPetikanPanen(
+        idPetani: AuthSession.currentIdPetani,
+        idMusim: AuthSession.currentIdMusim,
+        kodeSiklus: stageCode,
+        petikanKe: _currentStep,
+        beratKg: weight,
+        estimasiPendapatan: revenue,
+        tanggalPetik: _selectedDate,
+        kondisiDaun: note.isNotEmpty ? note : null,
+      );
+    } catch (_) {
+      // offline graceful fallback
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        Navigator.pop(context, {
+          'step': _currentStep,
+          'stage': stageCode,
+          'weight': _weightController.text,
+          'revenue': _revenueController.text,
+          'note': note,
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Data petikan $stageCode berhasil disimpan ke database!',
+              style: AppTypography.mono(fontSize: 12, color: Colors.white),
+            ),
+            backgroundColor: AppColors.ink,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -152,6 +240,7 @@ class _HarvestEditScreenState extends State<HarvestEditScreen> {
                           children: List.generate(_stages.length, (index) {
                             final stepNum = index + 1;
                             final isSelected = stepNum == _currentStep;
+                            final isLocked = stepNum > widget.maxUnlockedStep;
                             final stageCode = _stages[index];
 
                             return Padding(
@@ -163,15 +252,22 @@ class _HarvestEditScreenState extends State<HarvestEditScreen> {
                                   width: 48,
                                   padding: const EdgeInsets.symmetric(vertical: 8),
                                   decoration: BoxDecoration(
-                                    color: isSelected ? AppColors.orange : AppColors.paper,
+                                    color: isSelected
+                                        ? AppColors.orange
+                                        : (isLocked ? const Color(0xFFE2E8F0) : AppColors.paper),
                                     borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: AppColors.ink, width: 2),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppColors.ink,
-                                        offset: isSelected ? const Offset(1, 1) : const Offset(2.5, 2.5),
-                                      ),
-                                    ],
+                                    border: Border.all(
+                                      color: isLocked ? AppColors.muted.withValues(alpha: 0.35) : AppColors.ink,
+                                      width: 2,
+                                    ),
+                                    boxShadow: isLocked
+                                        ? null
+                                        : [
+                                            BoxShadow(
+                                              color: AppColors.ink,
+                                              offset: isSelected ? const Offset(1, 1) : const Offset(2.5, 2.5),
+                                            ),
+                                          ],
                                   ),
                                   child: Transform.translate(
                                     offset: isSelected ? const Offset(1, 1) : Offset.zero,
@@ -183,17 +279,30 @@ class _HarvestEditScreenState extends State<HarvestEditScreen> {
                                           style: AppTypography.mono(
                                             size: 16,
                                             weight: FontWeight.w900,
-                                            color: isSelected ? Colors.white : AppColors.ink,
+                                            color: isSelected
+                                                ? Colors.white
+                                                : (isLocked ? AppColors.muted : AppColors.ink),
                                           ),
                                         ),
                                         const SizedBox(height: 2),
-                                        Text(
-                                          stageCode,
-                                          style: AppTypography.mono(
-                                            size: 10,
-                                            weight: FontWeight.w700,
-                                            color: isSelected ? Colors.white : AppColors.ink.withValues(alpha: 0.7),
-                                          ),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (isLocked) ...[
+                                              Icon(Icons.lock_outline_rounded, size: 8, color: AppColors.muted.withValues(alpha: 0.8)),
+                                              const SizedBox(width: 2),
+                                            ],
+                                            Text(
+                                              stageCode,
+                                              style: AppTypography.mono(
+                                                size: 10,
+                                                weight: FontWeight.w700,
+                                                color: isSelected
+                                                    ? Colors.white
+                                                    : (isLocked ? AppColors.muted : AppColors.ink.withValues(alpha: 0.7)),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),
@@ -218,7 +327,7 @@ class _HarvestEditScreenState extends State<HarvestEditScreen> {
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                _stageDefaults[_currentStep]?['note'] ?? 'Catatan tahap $stageLabel',
+                                _stageDescriptions[_currentStep] ?? 'Catatan tahap $stageLabel',
                                 style: AppTypography.mono(
                                   size: 10.5,
                                   color: AppColors.ink,
@@ -359,11 +468,45 @@ class _HarvestEditScreenState extends State<HarvestEditScreen> {
                       ),
                       const SizedBox(height: 14),
 
+                      // Input Tanggal Penimbangan / Petikan
+                      MicroText.bold('TANGGAL PENIMBANGAN / PETIKAN', color: AppColors.ink),
+                      const SizedBox(height: 6),
+                      GestureDetector(
+                        onTap: _pickDate,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: AppColors.ink, width: 2),
+                            boxShadow: const [
+                              BoxShadow(color: AppColors.ink, offset: Offset(2, 2)),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '${_selectedDate.day.toString().padLeft(2, '0')}/${_selectedDate.month.toString().padLeft(2, '0')}/${_selectedDate.year}',
+                                  style: AppTypography.mono(
+                                    size: 16,
+                                    weight: FontWeight.w700,
+                                    color: AppColors.ink,
+                                  ),
+                                ),
+                              ),
+                              const Icon(Icons.calendar_today_outlined, size: 18, color: AppColors.ink),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
                       // Input Keterangan / Kondisi Daun
                       MicroText.bold('KETERANGAN / KONDISI DAUN', color: AppColors.ink),
                       const SizedBox(height: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(6),
@@ -374,12 +517,17 @@ class _HarvestEditScreenState extends State<HarvestEditScreen> {
                         ),
                         child: TextField(
                           controller: _noteController,
-                          maxLines: 2,
-                          style: AppTypography.body(size: 13, color: AppColors.ink),
-                          decoration: InputDecoration(
+                          minLines: 2,
+                          maxLines: 3,
+                          style: AppTypography.mono(
+                            size: 14,
+                            weight: FontWeight.w600,
+                            color: AppColors.ink,
+                          ),
+                          decoration: const InputDecoration(
                             border: InputBorder.none,
-                            hintText: 'Misal: Daun tebal, warna kuning merata, bebas bercak',
-                            hintStyle: AppTypography.body(size: 12, color: Colors.black38),
+                            hintText: 'Misal: Petikan pucuk daun, warna kuning merata',
+                            hintStyle: TextStyle(color: Colors.black26),
                           ),
                         ),
                       ),
@@ -390,27 +538,14 @@ class _HarvestEditScreenState extends State<HarvestEditScreen> {
 
                 // 3. Tombol Aksi (Simpan & Batal)
                 TrapezoidTabButton(
-                  label: '----SIMPAN CATATAN PETIKAN $stageLabel----',
+                  label: _isSaving
+                      ? '----MENYIMPAN DATA...----'
+                      : '----SIMPAN CATATAN PETIKAN $stageLabel----',
                   color: AppColors.orange,
                   textColor: Colors.white,
                   height: 48,
-                  onTap: () {
-                    Navigator.pop(context, {
-                      'step': _currentStep,
-                      'stage': stageLabel,
-                      'weight': _weightController.text,
-                      'revenue': _revenueController.text,
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Data petikan $stageLabel berhasil diperbarui!',
-                          style: AppTypography.mono(size: 12, color: Colors.white),
-                        ),
-                        backgroundColor: AppColors.ink,
-                      ),
-                    );
-                  },
+                  isLoading: _isSaving,
+                  onTap: _isSaving ? null : () => _saveHarvestPetikan(stageLabel),
                 ),
                 const SizedBox(height: 12),
 

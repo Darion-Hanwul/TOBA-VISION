@@ -111,11 +111,11 @@ Gunakan lebar acuan 360-430dp, dukung layar kecil (320dp) tanpa overflow, dan se
 - Header ala referensi: kiri microtext "PETANI MITRA / TB-LOGIN", tengah wordmark krom, kanan "TYPE 1 NORMAL POSITION".
 - Hero: GlassPhone kecil + teks raksasa "MASUK" di belakang.
 - Kartu hero brand (logo + "TOBA VISION" + badge "v2.4 AI" + "Asisten AI Cerdas Petani Tembakau Modern") menjadi RetroCard bergaya stiker.
-- Form "Nama Lengkap / Akun Petani" dan "Kata Sandi" dalam RetroCard: field kotak dengan border ink 2px, label mono uppercase, ikon person/lock, toggle lihat sandi. Default nama 'Slamet Raharjo' tetap.
+- Form "Nomor HP / Username Petani (ID Unik)" dan "Kata Sandi" dalam RetroCard: field kotak dengan border ink 2px, label mono uppercase, ikon phone/lock, toggle lihat sandi. Default identifier '081234567890' (menjamin tidak ada konflik nama yang sama dan kompatibel dengan Firebase Auth).
 - Tombol "Masuk ke Kebun" menjadi TrapezoidTabButton oranye di bawah ("----MASUK KE KEBUN----"). Link "Belum punya akun? Daftar Akun Baru" tetap, berbentuk teks mono bergaris bawah.
 
 6.3 `register_screen.dart`
-- Struktur dan gaya sama dengan Login. Field: Nama Lengkap, Alamat Lahan / Lokasi Kebun (+ helper "Alamat digunakan untuk integrasi cuaca & data lahan"), Kata Sandi, Konfirmasi Kata Sandi.
+- Struktur dan gaya sama dengan Login. Field: Nama Lengkap, Nomor WhatsApp / HP (ID Unik Akun - untuk login & kontak darurat BMKG), Alamat Lahan / Lokasi Kebun (+ helper "Alamat digunakan untuk integrasi cuaca & data lahan"), Luas Lahan Kebun (satuan baku: Meter Persegi / m²), Kata Sandi, Konfirmasi Kata Sandi.
 - Kartu info keamanan "Data akun tersimpan aman dan terenkripsi di perangkat untuk akses tanpa sinyal." menjadi strip label dengan ikon shield.
 - Validasi sandi cocok/tidak (ikon check) tetap, dengan styling baru.
 - CTA: "----DAFTAR AKUN SEKARANG----"; link "Sudah punya akun? Masuk Sekarang".
@@ -150,34 +150,34 @@ Gunakan lebar acuan 360-430dp, dukung layar kecil (320dp) tanpa overflow, dan se
 
 6.8 `finance/finance_screen.dart`
 - Header + tombol sync (snackbar sinkronisasi). Judul "Biaya & Pengeluaran Kebun" + deskripsi.
-- Kartu total: "TOTAL BIAYA", "Estimasi Musim Tanam", "Rp 14.250.000", dan "Tercatat dari 4 kategori pengeluaran operasional". Angka dalam font display raksasa di atas MarqueeText/ornamen. Pertahankan `_RingProgressPainter` (donat per kategori) dengan warna palet baru, kategori: Buruh Tani / Upah, Pupuk & Nutrisi, Bibit & Olah Lahan, Lainnya / Tambahan (ikon: groups, science, spa, category/inventory).
+- Kartu total: "TOTAL BIAYA", "Estimasi Musim Tanam", "Rp 14.250.000", dan "Tercatat dari 4 kategori pengeluaran operasional". Angka dalam font display raksasa di atas MarqueeText/ornamen. Pertahankan `_RingProgressPainter` (donat per kategori) dengan warna palet baru, 4 Kategori baku: Buruh Tani / Upah (`BURUH`), Pupuk & Nutrisi (`PUPUK`), Bibit & Olah Lahan (`BIBIT`), Lainnya / Tambahan (`LAINNYA`) (ikon: groups, science, spa, category/inventory).
 - "Rincian Biaya" (4 Pos Biaya) dalam daftar RetroCard dengan VuMeterBar persen.
-- "Riwayat Pengeluaran": daftar item (judul, tanggal • keterangan, nominal merah "-Rp ...") bergaya struk/tiket mono. Aksi per item: Edit (menuju `FinanceScreenEditUpload`) dan Hapus (dialog "Hapus Pengeluaran" / "Tindakan ini tidak dapat dibatalkan." / "Ya, Hapus" + snackbar). Tombol "Tambah Catatan Biaya" = TrapezoidTabButton oranye.
+- "Riwayat Pengeluaran": daftar item (judul, tanggal • keterangan, nominal merah "-Rp ...") bergaya struk/tiket mono. Dukungan soft delete (`is_deleted` tidak menghapus data permanen melainkan menandai arsip). Aksi per item: Edit (menuju `FinanceScreenEditUpload`) dan Hapus (dialog "Hapus Pengeluaran" / "Tindakan ini tidak dapat dibatalkan." / "Ya, Hapus" + snackbar). Tombol "Tambah Catatan Biaya" = TrapezoidTabButton oranye.
 - Bagian "Tutup Buku Musim / Akhir Musim" + tombol "Tutup Buku & Simpan Rekap" (menuju `FinanceEndScreen`); tombol arsip/semua musim menuju `FinanceAllMusimScreen`. Pertahankan chip "Musim Ini".
 
 6.9 `finance/finance_screen_edit_upload.dart`
-- Form tambah/edit pengeluaran: "Pilih Kategori Pembayaran" (grid pilihan kategori: Buruh & Petik, Pupuk & Nutrisi, Bibit & Olah Lahan, Logistik & Lain, dsb., tampil sebagai tombol fisik/stiker terpilih = border oranye + check), "Rincian & Tanggal" (field judul dengan hint 'Misal: Upah tenaga petik harian', pemilih tanggal, nominal, catatan 'Tuliskan catatan atau rincian tambahan di sini...'). Semua controller dan logika simpan tetap. CTA simpan = trapesium oranye.
+- Form tambah/edit pengeluaran: "Pilih Kategori Pembayaran" (grid pilihan 4 kategori baku: BURUH, PUPUK, BIBIT, LAINNYA, tampil sebagai tombol fisik/stiker terpilih = border oranye + check), "Rincian & Tanggal" (field judul dengan hint 'Misal: Upah tenaga petik harian', pemilih tanggal, nominal, catatan 'Tuliskan catatan atau rincian tambahan di sini...'). Semua controller dan logika simpan tetap. CTA simpan = trapesium oranye.
 
 6.10 `finance/finance_end_screen.dart`
 - "Rekap Tutup Buku Musim": gaya dokumen/struk mono di atas latar sage; "Musim Tanam 2026 • Lahan Blok A - Timur", "Total Pengeluaran Tercatat Rp 14.250.000", rincian 4 baris (Buruh Tani / Upah Kerja Rp 6.800.000, Pupuk & Nutrisi Rp 3.800.000, Bibit & Olah Lahan Rp 2.400.000, Lainnya / Operasional Rp 1.250.000), teks peringatan arsip.
-- Tombol "Konfirmasi & Simpan Arsip" (trapesium oranye) dan "Batal & Kembali" (tombol hitam outline). Snackbar tetap.
+- Tombol "Konfirmasi & Simpan Arsip" (trapesium oranye) dan "Batal & Kembali" (tombol hitam outline). Transaksi tutup buku bersifat atomik: mengunci musim berjalan dan membuka musim baru secara serempak.
 
 6.11 `finance/finance_all_musim_screen.dart`
-- "Rekap Semua Musim": daftar arsip musim sebagai kartu J-card, `_AllSeasonsRingProgressPainter` dipertahankan, filter kategori dengan chip bergaya tombol fisik (Bibit & Olah Lahan, Buruh & Petik, Pupuk & Nutrisi, Logistik & Lain). Aksi per kartu: Detail (dialog "Tutup"), Edit, Hapus (dialog Batal / Ya, Hapus + snackbar `Arsip "..." berhasil dihapus!`), tombol sync.
+- "Rekap Semua Musim": daftar arsip musim sebagai kartu J-card, `_AllSeasonsRingProgressPainter` dipertahankan, filter kategori dengan chip bergaya tombol fisik (Bibit & Olah Lahan, Buruh & Petik, Pupuk & Nutrisi, Logistik & Lain). Aksi per kartu: Detail (dialog "Tutup"), Edit (membuka kembali `FinanceScreen` dengan dataset musim tersebut), Hapus (dialog Batal / Ya, Hapus + snackbar `Arsip "..." berhasil dihapus!`), tombol sync.
 
 6.12 `harvest/harvest_screen.dart`
 - Header "Lahan Blok A • Temanggung" + sync. Judul "Monitoring Siklus Panen" + deskripsi. Chip periode ("PILIH PERIODE", "Musim Ini").
-- "Siklus Petikan Daun": chip/stepper tahap petikan (P1..P7, "P3 Aktif" ditandai blok oranye) bergaya jejeran tombol tape-deck.
+- "Siklus Petikan Daun": chip/stepper tahap petikan (P1..P7, "P3 Aktif" ditandai blok oranye) bergaya jejeran tombol tape-deck. Tahap aktif diturunkan secara dinamis (*derived state*: `jumlah_petikan_selesai + 1`, tanpa perlu menyimpan baris kosong status MENUNGGU).
 - "Target Keuntungan" ("TARGET 40 JT"), "Pencapaian Modal & Profit Bersih": angka "Rp 32,6 jt" display raksasa, VuMeterBar "81,6% Tercapai", "Modal: Rp 25.000.000", "Untung: +Rp 7.660.000", "Modal Rp 25 jt Lunas", badge "BEP TERCAPAI", "ESTIMASI LABA BERSIH +Rp 7.660.000".
 - "Distribusi Hasil Petikan / Per Tahapan (kg)": bar chart gaya equalizer; nilai 48, 52, 68, 20, 18, 15, 12 tetap.
-- Form "Timbangan Petikan P3": "Input hasil panen hari ini", "Hari Ini", field "Berat Tembakau (kg)" dan "Total Pendapatan (Rp)", tombol "Simpan Catatan Petikan P3" = trapesium oranye.
-- "Tutup Buku Siklus Panen": dialog konfirmasi ("Ya, Tutup Buku", "Batal") dan snackbar tetap. Tombol ke `HarvestEditScreen` dan `HarvestAllMusimScreen` tetap.
+- Form "Timbangan Petikan": field "Berat Tembakau (kg)", "Total Pendapatan (Rp)", "Tanggal Penimbangan / Petikan", dan textarea "Keterangan / Kondisi Daun" (hint 'Misal: Petikan pucuk daun, warna kuning merata'). Tombol "Simpan Catatan Petikan" = trapesium oranye.
+- "Tutup Buku Siklus Panen": Tombol "Tutup Buku & Simpan Rekap" dengan dialog konfirmasi ("Ya, Tutup Buku", "Batal") yang mengeksekusi penutupan musim secara atomik (menutup buku panen & keuangan sekaligus, serta membuka lembaran musim tanam baru).
 
 6.13 `harvest/harvest_edit_screen.dart`
-- "Pilih Tahapan yang Ingin Diedit": 7 tahap (Petikan daun pasir / bawah pertama, daun bawah kedua, daun tengah utama (kualitas prima), daun tengah kedua, daun atas, pucuk daun, petikan akhir / pembersihan) sebagai pilihan kartu bergaya kaset. Field "Berat Bersih Tembakau (kg)", "Total Penerimaan / Pendapatan (Rp)", "Keterangan / Kondisi Daun" (hint 'Misal: Daun tebal, warna kuning merata, bebas bercak'). Tombol Simpan (trapesium oranye) dan Batal; snackbar `Data petikan $stageLabel berhasil diperbarui!` tetap.
+- "Pilih Tahapan yang Ingin Diedit": 7 tahap (Petikan daun pasir / bawah pertama, daun bawah kedua, daun tengah utama (kualitas prima), daun tengah kedua, daun atas, pucuk daun, petikan akhir / pembersihan) sebagai pilihan kartu bergaya kaset. Form mencakup: "Berat Bersih Tembakau (kg)", "Total Penerimaan / Pendapatan (Rp)", "Tanggal Penimbangan / Petikan", dan textarea "Keterangan / Kondisi Daun" (hint 'Misal: Petikan pucuk daun, warna kuning merata'). Tombol Simpan (trapesium oranye) dan Batal; snackbar `Data petikan $stageLabel berhasil diperbarui!` tetap.
 
 6.14 `harvest/harvest_all_musim_screen.dart`
-- "Rekap Semua Musim Panen": daftar kartu J-card dengan aksi Detail / Edit / Hapus, dialog "Tutup" / "Batal" / "Ya, Hapus", snackbar tetap, tombol sync.
+- "Rekap Semua Musim Panen": daftar kartu J-card riwayat panen seluruh musim dengan aksi Detail, Edit (membuka kembali `HarvestScreen` dengan dataset musim lampau yang dipilih), dan Hapus (soft delete). Snackbar tetap, tombol sync.
 
 ==================================================
 7. ANIMASI, AKSESIBILITAS, PERFORMA

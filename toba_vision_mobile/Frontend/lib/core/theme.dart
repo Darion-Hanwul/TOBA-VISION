@@ -14,11 +14,13 @@ class AppColors {
 
   // Kompatibilitas Palet Lama (disesuaikan dengan palet retro)
   static const forest = Color(0xFF1B4019);
+  static const forestGreen = forest;
   static const green = Color(0xFF2F7D32);
   static const mint = Color(0xFFD4E8C2);
   static const peach = Color(0xFFFFE4D3);
   static const bg = Color(0xFF9CA882); // latar utama sage
   static const red = Color(0xFFC62828);
+  static const rust = red;
   static const redSoft = Color(0xFFF6D5CF);
   static const amber = Color(0xFFE08A00);
   static const amberSoft = Color(0xFFF5E3B8);

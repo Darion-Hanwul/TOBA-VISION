@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
+import '../data/auth_session.dart';
+import '../data/firestore_service.dart';
 import '../widgets/retro/blade_ornament.dart';
 import '../widgets/retro/chrome_wordmark.dart';
 import '../widgets/retro/micro_text.dart';
@@ -18,27 +20,164 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
+  final _areaController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
     _nameController.dispose();
     _addressController.dispose();
+    _areaController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  void _handleRegister() {
-    // Mode Slicing: Langsung navigasi ke HomeScreen (Shell) tanpa cek inputan
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const Shell()),
-      (route) => false,
+  void _showNameTakenDialog(String name) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.paper,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: const BorderSide(color: AppColors.ink, width: 2),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: AppColors.rust, size: 22),
+            const SizedBox(width: 8),
+            Text(
+              'NAMA SUDAH TERPAKAI',
+              style: AppTypography.display(
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+                color: AppColors.rust,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Nama petani "$name" sudah terdaftar dalam sistem.',
+              style: AppTypography.body(fontSize: 13, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Silakan gunakan nama lain atau variasikan nama Anda (misal tambah dusun), atau langsung masuk jika akun ini milik Anda.',
+              style: AppTypography.body(fontSize: 11.5, color: AppColors.muted),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'GANTI NAMA',
+              style: AppTypography.mono(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ink),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.orange,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pop(context); // Kembali ke halaman login
+            },
+            child: Text('MASUK SEKARANG', style: AppTypography.mono(fontSize: 11, fontWeight: FontWeight.w900)),
+          ),
+        ],
+      ),
     );
+  }
+
+  Future<void> _handleRegister() async {
+    final name = _nameController.text.trim();
+    final address = _addressController.text.trim();
+    final areaStr = _areaController.text.trim();
+    final password = _passwordController.text;
+    final confirm = _confirmPasswordController.text;
+
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Silakan masukkan Nama Lengkap Petani!'),
+          backgroundColor: AppColors.rust,
+        ),
+      );
+      return;
+    }
+
+    if (password.isNotEmpty && password != confirm) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Konfirmasi kata sandi tidak cocok!'),
+          backgroundColor: AppColors.rust,
+        ),
+      );
+      return;
+    }
+
+    final luas = double.tryParse(areaStr.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 1000.0;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final petani = await FirestoreService.instance.daftarPetaniBaru(
+        nama: name,
+        lokasiLahan: address.isEmpty ? 'Temanggung, Jawa Tengah' : address,
+        luasLahanM2: luas,
+        password: password.isEmpty ? null : password,
+      );
+
+      AuthSession.setSession(petani);
+      try {
+        final musim = await FirestoreService.instance.getOrCreateMusimAktif(petani.idPetani);
+        AuthSession.activeMusimId = musim.idMusim;
+      } catch (_) {}
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Selamat bergabung, ${petani.nama}! Akun berhasil dibuat.'),
+            backgroundColor: AppColors.forestGreen,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const Shell()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        if (e.toString().contains('NAMA_SUDAH_TERPAKAI')) {
+          _showNameTakenDialog(name);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Pendaftaran gagal: $e'),
+              backgroundColor: AppColors.rust,
+            ),
+          );
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -129,8 +268,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Field 1: Nama Lengkap
-                      const MicroText('NAMA LENGKAP', fontSize: 10),
+                      // Field 1: Nama Lengkap (ID Unik Petani)
+                      const MicroText('NAMA LENGKAP PETANI (ID UNIK AKUN)', fontSize: 10),
                       const SizedBox(height: 6),
                       Container(
                         decoration: BoxDecoration(
@@ -150,9 +289,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 4),
+                      const MicroText(
+                        '* Nama petani harus unik untuk identitas akun & login',
+                        fontSize: 8.5,
+                        color: AppColors.muted,
+                      ),
                       const SizedBox(height: 14),
 
-                      // Field 2: Alamat Lahan / Lokasi Kebun
+                      // Field 3: Alamat Lahan / Lokasi Kebun
                       const MicroText('ALAMAT LAHAN / LOKASI KEBUN', fontSize: 10),
                       const SizedBox(height: 6),
                       Container(
@@ -183,6 +328,49 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         '* Alamat digunakan untuk integrasi cuaca & data lahan',
                         fontSize: 8.5,
                         color: AppColors.muted,
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Field 4: Luas Lahan (Meter Persegi / m²)
+                      const MicroText('LUAS LAHAN KEBUN (METER PERSEGI / m²)', fontSize: 10),
+                      const SizedBox(height: 6),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppColors.ink, width: 2),
+                        ),
+                        child: Row(
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 12),
+                              child: Icon(Icons.square_foot_rounded, color: AppColors.ink, size: 20),
+                            ),
+                            Expanded(
+                              child: TextField(
+                                controller: _areaController,
+                                keyboardType: TextInputType.number,
+                                textInputAction: TextInputAction.next,
+                                style: AppTypography.mono(fontSize: 14, fontWeight: FontWeight.w700),
+                                decoration: const InputDecoration(
+                                  border: InputBorder.none,
+                                  hintText: 'Contoh: 2500',
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 0, vertical: 12),
+                                ),
+                              ),
+                            ),
+                            Container(
+                              margin: const EdgeInsets.only(right: 10),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.lime,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: AppColors.ink, width: 1.2),
+                              ),
+                              child: const MicroText('m²', fontSize: 10),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 14),
 
@@ -270,8 +458,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                 // Tombol CTA Trapesium Oranye
                 TrapezoidTabButton(
-                  label: 'DAFTAR AKUN SEKARANG',
-                  onPressed: _handleRegister,
+                  label: _isLoading ? 'MENDAFTARKAN...' : 'DAFTAR AKUN SEKARANG',
+                  isLoading: _isLoading,
+                  onPressed: _isLoading ? null : _handleRegister,
                 ),
                 const SizedBox(height: 16),
 

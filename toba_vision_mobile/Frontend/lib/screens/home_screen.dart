@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
+import '../data/auth_session.dart';
 import '../data/models.dart';
 import '../data/services.dart';
 import '../widgets/app_header.dart';
@@ -65,11 +66,11 @@ class HomeScreen extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.groups_rounded, size: 14, color: AppColors.ink),
+                    const Icon(Icons.location_on_outlined, size: 14, color: AppColors.ink),
                     const SizedBox(width: 5),
                     Flexible(
                       child: Text(
-                        '${p.group.toUpperCase()} • ${p.region.toUpperCase()}',
+                        p.region.toUpperCase(),
                         style: AppTypography.mono(
                           fontSize: 9.5,
                           fontWeight: FontWeight.w700,
@@ -278,16 +279,11 @@ class HomeScreen extends StatelessWidget {
                             p.name,
                             style: AppTypography.display(fontSize: 15, fontWeight: FontWeight.w900),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            p.group,
-                            style: AppTypography.body(fontSize: 12, color: AppColors.muted),
-                          ),
-                          const SizedBox(height: 1),
+                          const SizedBox(height: 3),
                           MicroText(
-                            'DOMISILI: ${p.region.toUpperCase()}',
-                            fontSize: 9,
-                            color: AppColors.ink,
+                            'LOKASI LAHAN: ${p.region.toUpperCase()}',
+                            fontSize: 9.5,
+                            color: AppColors.muted,
                           ),
                         ],
                       ),
@@ -345,6 +341,7 @@ class HomeScreen extends StatelessWidget {
             ),
             onPressed: () {
               Navigator.pop(ctx);
+              AuthSession.logout();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Anda berhasil keluar dari sistem.')),
               );

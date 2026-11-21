@@ -4,6 +4,7 @@ Materi Dosen & Praktikum/
 firebase_key.json
 toba_vision_mobile/Backend/firebase_key.json
 toba_vision_mobile/Backend/.env
+**/google-services.json
 
 .vscode/settings.json
 

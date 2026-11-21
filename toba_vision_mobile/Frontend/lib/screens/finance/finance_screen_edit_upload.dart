@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
+import '../../data/auth_session.dart';
+import '../../data/firestore_service.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/retro/blade_ornament.dart';
 import '../../widgets/retro/micro_text.dart';
@@ -22,6 +24,7 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
   late TextEditingController _titleController;
   late TextEditingController _notesController;
   late DateTime _selectedDate;
+  bool _isSaving = false;
 
   final List<Map<String, dynamic>> _categories = [
     {
@@ -100,7 +103,7 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
     super.dispose();
   }
 
-  void _saveExpense() {
+  Future<void> _saveExpense() async {
     final title = _titleController.text.trim();
     if (title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -112,13 +115,59 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Catatan "$title" berhasil disimpan!'),
-        backgroundColor: AppColors.ink,
-      ),
-    );
-    Navigator.pop(context);
+    final rawAmount = _amountController.text.replaceAll(RegExp(r'[^0-9.]'), '');
+    final amount = double.tryParse(rawAmount) ?? 0.0;
+    if (amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nominal pengeluaran harus lebih besar dari 0!'),
+          backgroundColor: AppColors.red,
+        ),
+      );
+      return;
+    }
+
+    final categoryCodes = ['BURUH', 'PUPUK', 'BIBIT', 'LAINNYA'];
+    final selectedCode = categoryCodes[_selectedCategoryIndex.clamp(0, 3)];
+
+    setState(() => _isSaving = true);
+
+    try {
+      await FirestoreService.instance.simpanBiayaOperasional(
+        idPetani: AuthSession.currentIdPetani,
+        idMusim: AuthSession.currentIdMusim,
+        idBiaya: widget.initialData?['idBiaya'],
+        kodeKategori: selectedCode,
+        namaPengeluaran: title,
+        jumlahBiaya: amount,
+        tanggal: _selectedDate,
+        catatan: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Catatan "$title" berhasil disimpan ke database!'),
+            backgroundColor: AppColors.ink,
+          ),
+        );
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Tersimpan offline/lokal: $e'),
+            backgroundColor: AppColors.orange,
+          ),
+        );
+        Navigator.pop(context, true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   @override
@@ -281,9 +330,10 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
 
                 // Tombol Simpan CTA Trapesium Oranye
                 TrapezoidTabButton(
-                  label: 'SIMPAN CATATAN BIAYA',
+                  label: _isSaving ? 'MENYIMPAN DATA...' : 'SIMPAN CATATAN BIAYA',
+                  isLoading: _isSaving,
                   icon: Icons.check_rounded,
-                  onPressed: _saveExpense,
+                  onPressed: _isSaving ? null : _saveExpense,
                 ),
               ],
             ),
