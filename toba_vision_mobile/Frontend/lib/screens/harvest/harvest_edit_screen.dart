@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import '../../services/panen_service.dart';
 import '../../widgets/app_header.dart';
 
 class HarvestEditScreen extends StatefulWidget {
   final int initialStep;
   final String stageName;
+  final String idSiklus;
 
   const HarvestEditScreen({
     super.key,
     required this.initialStep,
     required this.stageName,
+    this.idSiklus = "siklus_2026_01",
   });
 
   @override
@@ -20,6 +23,7 @@ class _HarvestEditScreenState extends State<HarvestEditScreen> {
   late TextEditingController _weightController;
   late TextEditingController _revenueController;
   late TextEditingController _noteController;
+  bool _isLoading = false;
 
   final List<String> _stages = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7'];
 
@@ -60,6 +64,67 @@ class _HarvestEditScreenState extends State<HarvestEditScreen> {
     _revenueController.dispose();
     _noteController.dispose();
     super.dispose();
+  }
+
+  // ==========================================
+  // PROSES SIMPAN PERUBAHAN PETIKAN KE BACKEND
+  // ==========================================
+  Future<void> _handleSaveEditPetikan() async {
+    final double weight = double.tryParse(_weightController.text.replaceAll(',', '.')) ?? 0.0;
+    final double revenue = double.tryParse(_revenueController.text.replaceAll('.', '').replaceAll(',', '')) ?? 0.0;
+    final String note = _noteController.text.trim();
+    final String stageLabel = _stages[_currentStep - 1];
+
+    if (weight <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nominal berat timbangan harus lebih besar dari 0!'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      // Simpan perubahan data via PanenService
+      await PanenService.tambahPanen(
+        idSiklus: widget.idSiklus,
+        petikanKe: _currentStep,
+        beratKg: weight,
+        totalPendapatan: revenue,
+        keterangan: note,
+        isOnline: true,
+      );
+
+      if (!mounted) return;
+
+      Navigator.pop(context, {
+        'step': _currentStep,
+        'stage': stageLabel,
+        'weight': _weightController.text,
+        'revenue': _revenueController.text,
+        'note': note,
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Data petikan $stageLabel berhasil diperbarui!'),
+          backgroundColor: const Color(0xFF064E3B),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal memperbarui petikan: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -335,23 +400,16 @@ class _HarvestEditScreenState extends State<HarvestEditScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   elevation: 2,
                 ),
-                onPressed: () {
-                  Navigator.pop(context, {
-                    'step': _currentStep,
-                    'stage': stageLabel,
-                    'weight': _weightController.text,
-                    'revenue': _revenueController.text,
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Data petikan $stageLabel berhasil diperbarui!'),
-                      backgroundColor: const Color(0xFF064E3B),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.check_circle_outline_rounded, size: 20),
+                onPressed: _isLoading ? null : _handleSaveEditPetikan,
+                icon: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
+                    : const Icon(Icons.check_circle_outline_rounded, size: 20),
                 label: Text(
-                  'Simpan Perubahan $stageLabel',
+                  _isLoading ? 'Menyimpan...' : 'Simpan Perubahan $stageLabel',
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                 ),
               ),

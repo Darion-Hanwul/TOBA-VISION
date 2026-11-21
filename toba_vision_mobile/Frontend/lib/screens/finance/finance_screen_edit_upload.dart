@@ -3,8 +3,13 @@ import '../../widgets/app_header.dart';
 
 class FinanceScreenEditUpload extends StatefulWidget {
   final Map<String, dynamic>? initialData;
+  final String idSiklus;
 
-  const FinanceScreenEditUpload({super.key, this.initialData});
+  const FinanceScreenEditUpload({
+    super.key,
+    this.initialData,
+    this.idSiklus = "siklus_2026_01",
+  });
 
   @override
   State<FinanceScreenEditUpload> createState() => _FinanceScreenEditUploadState();
@@ -16,31 +21,32 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
   late TextEditingController _titleController;
   late TextEditingController _notesController;
   late DateTime _selectedDate;
+  bool _isLoading = false;
 
   final List<Map<String, dynamic>> _categories = [
     {
-      'name': 'Buruh Tani / Upah Kerja',
+      'name': 'Buruh Tani / Upah',
       'desc': 'Petik, jemur, kuli angkut',
       'icon': Icons.groups_rounded,
-      'activeBg': Color(0xFF166534),
+      'activeBg': const Color(0xFF065F46),
     },
     {
       'name': 'Pupuk & Nutrisi',
       'desc': 'NPK, ZA, kompos, suplemen',
       'icon': Icons.science_outlined,
-      'activeBg': Color(0xFF166534),
+      'activeBg': const Color(0xFF4338CA),
     },
     {
       'name': 'Bibit & Olah Lahan',
       'desc': 'Benih unggul, traktor/bajak',
       'icon': Icons.spa_outlined,
-      'activeBg': Color(0xFF166534),
+      'activeBg': const Color(0xFF115E59),
     },
     {
       'name': 'Lainnya / Tambahan',
       'desc': 'Terpal, karung, tali rafia, transport',
       'icon': Icons.more_horiz_rounded,
-      'activeBg': Color(0xFF166534),
+      'activeBg': const Color(0xFF92400E),
     },
   ];
 
@@ -49,22 +55,37 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
     super.initState();
     final data = widget.initialData;
 
+    // Jika mode edit, pilih kategori awal sesuai item yang diedit
+    if (data != null && data['category'] != null) {
+      final catLower = data['category'].toString().toLowerCase();
+      if (catLower.contains('buruh') || catLower.contains('upah')) {
+        _selectedCategoryIndex = 0;
+      } else if (catLower.contains('pupuk') || catLower.contains('nutrisi')) {
+        _selectedCategoryIndex = 1;
+      } else if (catLower.contains('bibit') || catLower.contains('olah') || catLower.contains('lahan')) {
+        _selectedCategoryIndex = 2;
+      } else {
+        _selectedCategoryIndex = 3;
+      }
+    }
+
+    // Mode baru dimulai dari kosong (0), mode edit diisi dari data sebelumnya
     _amountController = TextEditingController(
       text: data != null && data['amount'] != null
           ? data['amount'].toString().replaceAll(RegExp(r'[^0-9]'), '')
-          : '750000',
+          : '',
     );
 
     _titleController = TextEditingController(
       text: data != null && data['title'] != null
           ? data['title'].toString()
-          : 'Upah 5 Tenaga Petik Harian - Blok Timur',
+          : '',
     );
 
     _notesController = TextEditingController(
       text: data != null && data['notes'] != null
           ? data['notes'].toString()
-          : '5 orang @ Rp 150.000 per hari kerja',
+          : '',
     );
 
     _selectedDate = DateTime.now();
@@ -88,7 +109,6 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
   }
 
   String _terbilang(int number) {
-    if (number == 750000) return 'Tujuh ratus lima puluh ribu rupiah';
     if (number <= 0) return 'Nol rupiah';
     return 'Nominal: Rp ${_formatAmount(number.toString())} rupiah';
   }
@@ -117,11 +137,77 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
     }
   }
 
+  // ==========================================
+  // VALIDASI & KIRIM DATA KEMBALI KE FINANCESCREEN
+  // ==========================================
+  Future<void> _handleSaveBiaya() async {
+    final String title = _titleController.text.trim();
+    final String amountText = _amountController.text.replaceAll(RegExp(r'[^0-9]'), '').trim();
+    final double amountVal = double.tryParse(amountText) ?? 0.0;
+    final String category = _categories[_selectedCategoryIndex]['name'];
+    final String notes = _notesController.text.trim();
+
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nama / keperluan biaya tidak boleh kosong!'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    if (amountVal <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nominal pengeluaran harus lebih besar dari 0!'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      if (!mounted) return;
+
+      // Kembalikan payload ke FinanceScreen agar disimpan & dihitung ulang tanpa duplikasi
+      Navigator.pop(context, {
+        'title': title,
+        'amount': '-Rp ${_formatAmount(amountText)}',
+        'raw_amount': amountVal,
+        'category': category,
+        'date': '${_selectedDate.day} ${_getMonthName(_selectedDate.month)} ${_selectedDate.year}',
+        'notes': notes,
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(widget.initialData != null
+              ? 'Catatan pengeluaran berhasil diperbarui!'
+              : 'Pengeluaran baru berhasil dicatat!'),
+          backgroundColor: const Color(0xFF166534),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal menyimpan biaya: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.initialData != null;
     final int numericAmount =
-        int.tryParse(_amountController.text.replaceAll('.', '').replaceAll(',', '')) ?? 0;
+        int.tryParse(_amountController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9FB),
@@ -130,14 +216,17 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
         title: isEdit ? 'Ubah Pengeluaran' : 'Catat Pengeluaran Baru',
         backgroundColor: const Color(0xD9F7F9FB),
         showBottomBorder: true,
-        trailing: Container(
-          width: 32,
-          height: 32,
-          decoration: const BoxDecoration(
-            color: Color(0xFF004C22),
-            shape: BoxShape.circle,
+        trailing: GestureDetector(
+          onTap: _isLoading ? null : _handleSaveBiaya,
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: const BoxDecoration(
+              color: Color(0xFF004C22),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check_rounded, color: Colors.white, size: 18),
           ),
-          child: const Icon(Icons.check_rounded, color: Colors.white, size: 18),
         ),
       ),
       body: SingleChildScrollView(
@@ -145,7 +234,6 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Subtle Header Description & Quick Status Bar
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
               child: Column(
@@ -222,13 +310,11 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
               ),
             ),
 
-            // Form Content
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // SECTION 2: PILIH KATEGORI PEMBAYARAN
                   _buildSectionHeader(
                     icon: Icons.grid_view_rounded,
                     title: 'Pilih Kategori Pembayaran',
@@ -239,7 +325,6 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
 
                   const SizedBox(height: 28),
 
-                  // SECTION 3: RINCIAN & TANGGAL
                   _buildSectionHeader(
                     icon: Icons.edit_note_rounded,
                     title: 'Rincian & Tanggal',
@@ -250,21 +335,20 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
 
                   const SizedBox(height: 24),
 
-                  // Info Field Tip Box
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: const Color(0xFFA6F4B5).withValues(alpha: 0.25),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Row(
+                    child: const Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
+                      children: [
                         Icon(Icons.info_outline_rounded, color: Color(0xFF004C22), size: 18),
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Catatan pengeluaran ini akan langsung diperbarui ke ringkasan total estimasi biaya musim tanam.',
+                            'Catatan pengeluaran ini akan langsung diperbarui ke ringkasan total estimasi biaya musim tanam dan modal perhitungan BEP panen.',
                             style: TextStyle(
                               fontSize: 12,
                               height: 1.45,
@@ -279,7 +363,6 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
 
                   const SizedBox(height: 28),
 
-                  // BOTTOM ACTION BUTTONS
                   _buildActionButtons(isEdit),
                 ],
               ),
@@ -330,6 +413,7 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
       children: List.generate(_categories.length, (index) {
         final cat = _categories[index];
         final isSelected = _selectedCategoryIndex == index;
+        final Color activeColor = cat['activeBg'] as Color;
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 10),
@@ -341,7 +425,7 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isSelected ? const Color(0xFF004C22) : const Color(0x0D000000),
+                  color: isSelected ? activeColor : const Color(0x0D000000),
                   width: isSelected ? 1.5 : 1,
                 ),
                 boxShadow: const [
@@ -354,7 +438,7 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFF166534) : const Color(0xFFE6E8EA),
+                      color: isSelected ? activeColor : const Color(0xFFE6E8EA),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
@@ -391,7 +475,7 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
                     width: 22,
                     height: 22,
                     decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFF004C22) : const Color(0xFFECEEF0),
+                      color: isSelected ? activeColor : const Color(0xFFECEEF0),
                       shape: BoxShape.circle,
                     ),
                     child: isSelected
@@ -420,12 +504,11 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Field Nominal Pengeluaran
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: const [
+              const Row(
+                children: [
                   Icon(Icons.payments_outlined, size: 16, color: Color(0xFF004C22)),
                   SizedBox(width: 6),
                   Text(
@@ -457,7 +540,6 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
           ),
           const SizedBox(height: 8),
 
-          // Input Box Nominal
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
@@ -491,6 +573,8 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
                         ),
                         decoration: const InputDecoration(
                           border: InputBorder.none,
+                          hintText: '0',
+                          hintStyle: TextStyle(color: Color(0xFF94A3B8)),
                           isDense: true,
                           contentPadding: EdgeInsets.zero,
                         ),
@@ -518,10 +602,9 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
           const Divider(height: 1, color: Color(0xFFECEEF0)),
           const SizedBox(height: 16),
 
-          // Field Nama / Keperluan
-          Row(
+          const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
+            children: [
               Text(
                 'Nama / Keperluan Biaya',
                 style: TextStyle(
@@ -556,13 +639,13 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
               decoration: const InputDecoration(
                 border: InputBorder.none,
                 hintText: 'Misal: Upah tenaga petik harian',
+                hintStyle: TextStyle(color: Color(0xFF94A3B8)),
               ),
             ),
           ),
 
           const SizedBox(height: 16),
 
-          // Field Tanggal Transaksi
           const Text(
             'Tanggal Transaksi',
             style: TextStyle(
@@ -602,10 +685,9 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
 
           const SizedBox(height: 16),
 
-          // Field Catatan Tambahan (Opsional)
-          Row(
+          const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
+            children: [
               Text(
                 'Catatan Tambahan',
                 style: TextStyle(
@@ -641,6 +723,7 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
               decoration: const InputDecoration(
                 border: InputBorder.none,
                 hintText: 'Tuliskan catatan atau rincian tambahan di sini...',
+                hintStyle: TextStyle(color: Color(0xFF94A3B8)),
               ),
             ),
           ),
@@ -652,7 +735,6 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
   Widget _buildActionButtons(bool isEdit) {
     return Column(
       children: [
-        // Tombol Simpan
         SizedBox(
           width: double.infinity,
           height: 52,
@@ -663,25 +745,18 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 2,
             ),
-            onPressed: () {
-              Navigator.pop(context, {
-                'title': _titleController.text,
-                'amount': '-Rp ${_formatAmount(_amountController.text)}',
-                'category': _categories[_selectedCategoryIndex]['name'],
-                'date': '${_selectedDate.day} ${_getMonthName(_selectedDate.month)} ${_selectedDate.year}',
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(isEdit
-                      ? 'Catatan pengeluaran berhasil diperbarui!'
-                      : 'Pengeluaran baru berhasil dicatat!'),
-                  backgroundColor: const Color(0xFF166534),
-                ),
-              );
-            },
-            icon: const Icon(Icons.check_circle_outline_rounded, size: 20),
+            onPressed: _isLoading ? null : _handleSaveBiaya,
+            icon: _isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                : const Icon(Icons.check_circle_outline_rounded, size: 20),
             label: Text(
-              isEdit ? 'Simpan Perubahan' : 'Simpan Pengeluaran',
+              _isLoading
+                  ? 'Menyimpan...'
+                  : (isEdit ? 'Simpan Perubahan' : 'Simpan Pengeluaran'),
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
             ),
           ),
@@ -689,7 +764,6 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
 
         const SizedBox(height: 10),
 
-        // Tombol Batal
         SizedBox(
           width: double.infinity,
           height: 48,

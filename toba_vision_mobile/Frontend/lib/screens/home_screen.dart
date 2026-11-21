@@ -1,53 +1,262 @@
+import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:http/http.dart' as http;
 import '../core/theme.dart';
 import '../data/models.dart';
-import '../data/services.dart';
+import '../services/api_service.dart';
+import '../services/auth_service.dart';
+import '../services/offline_service.dart';
 import '../widgets/app_header.dart';
-import '../widgets/async_view.dart';
 import 'login_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   final ValueChanged<int> onNavigate;
   const HomeScreen({super.key, required this.onNavigate});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  String _namaPetani = 'Petani Mitra';
+  String _alamatTerdaftar = 'Lokasi Kebun Belum Diatur';
+  String _currentLocationLabel = 'Mendeteksi lokasi...';
+  bool _isLoadingProfile = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initHomeData();
+  }
+
+  Future<void> _initHomeData() async {
+    await _loadActivePetaniProfile();
+    await _detectCurrentLocation();
+  }
+
+  String _dynamicGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour >= 4 && hour < 11) return 'Selamat Pagi';
+    if (hour >= 11 && hour < 15) return 'Selamat Siang';
+    if (hour >= 15 && hour < 18) return 'Selamat Sore';
+    return 'Selamat Malam';
+  }
+
+  Future<void> _loadActivePetaniProfile() async {
+    try {
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      final userData = OfflineService.getUserData();
+
+      String nama = (userData['nama']?.toString().trim().isNotEmpty ?? false) &&
+              userData['nama'] != 'Petani Toba'
+          ? userData['nama'].toString().trim()
+          : (firebaseUser?.displayName?.trim().isNotEmpty ?? false)
+              ? firebaseUser!.displayName!.trim()
+              : 'Petani Mitra';
+
+      String alamat = (userData['alamat_lahan']?.toString().trim().isNotEmpty ?? false)
+          ? userData['alamat_lahan'].toString().trim()
+          : '';
+
+      if (mounted) {
+        setState(() {
+          _namaPetani = nama;
+          if (alamat.isNotEmpty) _alamatTerdaftar = alamat;
+          _isLoadingProfile = false;
+        });
+      }
+
+      if (firebaseUser != null) {
+        final cloudProfile = await ApiService.getPetaniProfile(firebaseUser.uid);
+        if (cloudProfile != null && mounted) {
+          final cloudNama = cloudProfile['nama']?.toString().trim() ?? '';
+          final cloudAlamat = cloudProfile['alamat_lahan']?.toString().trim() ?? '';
+          setState(() {
+            if (cloudNama.isNotEmpty) _namaPetani = cloudNama;
+            if (cloudAlamat.isNotEmpty) _alamatTerdaftar = cloudAlamat;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Gagal memuat profil petani di Beranda: $e');
+      if (mounted) setState(() => _isLoadingProfile = false);
+    }
+  }
+
+  Future<void> _detectCurrentLocation() async {
+    try {
+      final box = Hive.isBoxOpen('toba_offline_box')
+          ? Hive.box('toba_offline_box')
+          : await Hive.openBox('toba_offline_box');
+
+      final String? cachedLoc = box.get('current_user_location')?.toString();
+      if (cachedLoc != null && cachedLoc.isNotEmpty && mounted) {
+        setState(() => _currentLocationLabel = cachedLoc);
+      }
+
+      double? lat;
+      double? lon;
+
+      try {
+        if (!kIsWeb) {
+          final bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+          if (!serviceEnabled) {
+            throw Exception('Location service disabled');
+          }
+        }
+
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+        if (permission == LocationPermission.denied ||
+            permission == LocationPermission.deniedForever) {
+          throw Exception('Location permission denied');
+        }
+
+        final Position pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            timeLimit: Duration(seconds: 8),
+          ),
+        );
+        lat = pos.latitude;
+        lon = pos.longitude;
+      } catch (gpsError) {
+        debugPrint('GPS fallback ke lokasi jaringan di Beranda: $gpsError');
+        final ipRes = await http
+            .get(Uri.parse('https://ipapi.co/json/'))
+            .timeout(const Duration(seconds: 5));
+        if (ipRes.statusCode == 200) {
+          final ipData = jsonDecode(ipRes.body);
+          final String city = (ipData['city'] ?? '').toString();
+          final String region = (ipData['region'] ?? '').toString();
+          if (city.isNotEmpty) {
+            final fallbackPlace = region.isNotEmpty ? '$city, $region' : city;
+            await box.put('current_user_location', fallbackPlace);
+            if (mounted) setState(() => _currentLocationLabel = fallbackPlace);
+            return;
+          }
+        }
+      }
+
+      if (lat != null && lon != null) {
+        final uri = Uri.parse(
+          'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$lat&lon=$lon&accept-language=id',
+        );
+        final response = await http.get(
+          uri,
+          headers: {'User-Agent': 'TobaVisionApp/1.0'},
+        ).timeout(const Duration(seconds: 6));
+
+        String resolvedPlace = '${lat.toStringAsFixed(3)}, ${lon.toStringAsFixed(3)}';
+
+        if (response.statusCode == 200) {
+          final Map<String, dynamic> data = jsonDecode(response.body);
+          final Map<String, dynamic> address =
+              Map<String, dynamic>.from(data['address'] ?? {});
+
+          final String? subDistrict = address['suburb'] ??
+              address['village'] ??
+              address['town'] ??
+              address['municipality'];
+          final String? city = address['city'] ??
+              address['county'] ??
+              address['regency'] ??
+              address['state_district'];
+
+          if (subDistrict != null && city != null) {
+            resolvedPlace = '$subDistrict, $city';
+          } else if (city != null) {
+            resolvedPlace = city;
+          } else if (subDistrict != null) {
+            resolvedPlace = subDistrict;
+          }
+        }
+
+        await box.put('current_user_location', resolvedPlace);
+        if (mounted) setState(() => _currentLocationLabel = resolvedPlace);
+      }
+    } catch (e) {
+      debugPrint('Gagal mendeteksi lokasi saat ini di Beranda: $e');
+      if (mounted && _currentLocationLabel == 'Mendeteksi lokasi...') {
+        setState(() {
+          _currentLocationLabel = _alamatTerdaftar != 'Lokasi Kebun Belum Diatur'
+              ? _alamatTerdaftar
+              : 'Lokasi Saat Ini';
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return AsyncView<UserProfile>(
-      load: () => Services.user.getProfile(),
-      builder: (context, p) => Column(
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? 'TB-2026';
+    final shortId = uid.length >= 6 ? uid.substring(0, 6).toUpperCase() : uid.toUpperCase();
+
+    final profile = UserProfile(
+      name: _namaPetani,
+      group: 'Mitra Petani Toba Vision',
+      region: _alamatTerdaftar,
+    );
+
+    final String subtitleLocation =
+        _currentLocationLabel != 'Mendeteksi lokasi...' && _currentLocationLabel != 'Lokasi Saat Ini'
+            ? _currentLocationLabel
+            : (_alamatTerdaftar != 'Lokasi Kebun Belum Diatur'
+                ? _alamatTerdaftar
+                : _currentLocationLabel);
+
+    if (_isLoadingProfile) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 48),
+          child: CircularProgressIndicator(color: AppColors.forest),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AppHeader(
-            subtitle: 'TEMANGGUNG, JATENG',
+            subtitle: subtitleLocation.toUpperCase(),
             padding: EdgeInsets.zero,
             height: null,
             logoSize: 44,
             useAppLogo: true,
             trailing: AppHeaderActionButton(
               icon: Icons.person_outline_rounded,
-              onTap: () => _showProfileModal(context, p),
+              onTap: () => _showProfileModal(context, profile, shortId, subtitleLocation),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           Text(
-            '${greeting()}, ${p.name}',
+            '${_dynamicGreeting()}, ${profile.name}',
             style: const TextStyle(
-              fontFamily: kSerif,
               fontSize: 22,
               fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+              color: Color(0xFF0F172A),
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Row(
             children: [
-              const Icon(Icons.groups_rounded, size: 16, color: AppColors.amber),
+              const Icon(Icons.groups_outlined, size: 17, color: AppColors.amber),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  '${p.group} • ${p.region}',
+                  '${profile.group} • $subtitleLocation',
                   style: const TextStyle(
-                    fontFamily: kSerif,
-                    fontSize: 14,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
                     color: AppColors.muted,
                   ),
                 ),
@@ -61,31 +270,37 @@ class HomeScreen extends StatelessWidget {
               Text(
                 'Fitur Utama Lapangan',
                 style: TextStyle(
-                  fontFamily: kSerif,
-                  fontSize: 18,
+                  fontSize: 17,
                   fontWeight: FontWeight.w800,
+                  letterSpacing: -0.2,
+                  color: Color(0xFF0F172A),
                 ),
               ),
               Text(
                 'Akses Cepat',
                 style: TextStyle(
-                  fontFamily: kSerif,
                   fontSize: 12,
+                  fontWeight: FontWeight.w500,
                   color: AppColors.muted,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          _FeatureGrid(onNavigate: onNavigate),
+          _FeatureGrid(onNavigate: widget.onNavigate),
           const SizedBox(height: 20),
-          _AiBanner(onTap: () => onNavigate(1)),
+          _AiBanner(onTap: () => widget.onNavigate(1)),
         ],
       ),
     );
   }
 
-  void _showProfileModal(BuildContext context, UserProfile p) {
+  void _showProfileModal(
+    BuildContext context,
+    UserProfile p,
+    String shortId,
+    String currentDetectedLocation,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -100,7 +315,6 @@ class HomeScreen extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Handle pill
             Center(
               child: Container(
                 width: 40,
@@ -112,15 +326,12 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Modal Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
                   'Profil Petani',
                   style: TextStyle(
-                    fontFamily: kSerif,
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
                     color: Color(0xFF0F172A),
@@ -135,8 +346,6 @@ class HomeScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 18),
-
-            // Profile Card (Avatar & Nama & Status)
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -175,7 +384,6 @@ class HomeScreen extends StatelessWidget {
                               child: Text(
                                 p.name,
                                 style: const TextStyle(
-                                  fontFamily: kSerif,
                                   fontSize: 17,
                                   fontWeight: FontWeight.w800,
                                   color: Color(0xFF0F172A),
@@ -189,9 +397,13 @@ class HomeScreen extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 2),
-                        const Text(
-                          'ID: TB-2026-088 • Petani Mitra Aktif',
-                          style: TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w500),
+                        Text(
+                          'ID: TB-$shortId • Petani Mitra Aktif',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.muted,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ],
                     ),
@@ -200,8 +412,6 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Detail Info Box (Nama, Alamat/Wilayah, Kelompok, Lahan)
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -218,16 +428,20 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const Divider(height: 20, color: Color(0xFFF1F5F9)),
                   _buildProfileRow(
+                    icon: Icons.my_location_rounded,
+                    label: 'Lokasi Saat Ini (GPS)',
+                    value: currentDetectedLocation,
+                  ),
+                  const Divider(height: 20, color: Color(0xFFF1F5F9)),
+                  _buildProfileRow(
                     icon: Icons.location_on_outlined,
-                    label: 'Alamat / Domisili Lahan',
-                    value: '${p.region}, Temanggung, Jawa Tengah',
+                    label: 'Alamat Rumah / Alamat Lahan',
+                    value: p.region,
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 20),
-
-            // Tombol Log Out
             SizedBox(
               width: double.infinity,
               height: 48,
@@ -326,8 +540,11 @@ class HomeScreen extends StatelessWidget {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
+              await AuthService.logout();
+              if (!context.mounted) return;
+
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Anda telah berhasil keluar dari akun.'),
@@ -348,10 +565,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
-
-// ---------------------------------------------------------------------------
-// Feature Grid Model & Data
-// ---------------------------------------------------------------------------
 
 class _FeatureItem {
   final IconData icon;
@@ -406,10 +619,6 @@ const List<_FeatureItem> _features = [
   ),
 ];
 
-// ---------------------------------------------------------------------------
-// Feature Grid Widget
-// ---------------------------------------------------------------------------
-
 class _FeatureGrid extends StatelessWidget {
   final ValueChanged<int> onNavigate;
 
@@ -462,10 +671,6 @@ class _FeatureGrid extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Feature Cell Widget
-// ---------------------------------------------------------------------------
-
 class _FeatureCell extends StatelessWidget {
   final _FeatureItem item;
   final VoidCallback onTap;
@@ -480,8 +685,8 @@ class _FeatureCell extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 125),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        constraints: const BoxConstraints(minHeight: 118),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         alignment: Alignment.centerLeft,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -489,23 +694,23 @@ class _FeatureCell extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 48,
-              height: 48,
+              width: 46,
+              height: 46,
               decoration: BoxDecoration(
                 color: item.bg,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(item.icon, color: item.fg),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Text(
               item.title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontFamily: kSerif,
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
+                color: Color(0xFF0F172A),
               ),
             ),
             const SizedBox(height: 2),
@@ -514,8 +719,7 @@ class _FeatureCell extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontFamily: kSerif,
-                fontSize: 11,
+                fontSize: 11.5,
                 color: AppColors.muted,
               ),
             ),
@@ -525,10 +729,6 @@ class _FeatureCell extends StatelessWidget {
     );
   }
 }
-
-// ---------------------------------------------------------------------------
-// AI Banner Widget (kept in-file)
-// ---------------------------------------------------------------------------
 
 class _AiBanner extends StatelessWidget {
   final VoidCallback onTap;
@@ -553,7 +753,7 @@ class _AiBanner extends StatelessWidget {
           const Positioned(
             right: -4,
             top: -4,
-            child: Icon(Icons.local_florist_outlined, size: 64, color: Color(0x33FFFFFF)),
+            child: Icon(Icons.local_florist_outlined, size: 68, color: Color(0x33FFFFFF)),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -572,7 +772,6 @@ class _AiBanner extends StatelessWidget {
                     Text(
                       'AI Vision Standar SNI',
                       style: TextStyle(
-                        fontFamily: kSerif,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: AppColors.mint,
@@ -585,7 +784,6 @@ class _AiBanner extends StatelessWidget {
               const Text(
                 'Pindai Mutu Daun Tembakau',
                 style: TextStyle(
-                  fontFamily: kSerif,
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
                   color: Colors.white,
@@ -595,15 +793,15 @@ class _AiBanner extends StatelessWidget {
               const Text(
                 'Arahkan kamera ke daun untuk cek kematangan & prediksi grade instan.',
                 style: TextStyle(
-                  fontFamily: kSerif,
-                  fontSize: 14,
+                  fontSize: 13.5,
                   color: AppColors.mint,
+                  height: 1.4,
                 ),
               ),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
-                height: 52,
+                height: 50,
                 child: FilledButton.icon(
                   style: FilledButton.styleFrom(
                     backgroundColor: Colors.white,
@@ -617,9 +815,8 @@ class _AiBanner extends StatelessWidget {
                   label: const Text(
                     'Buka Kamera AI',
                     style: TextStyle(
-                      fontFamily: kSerif,
                       fontWeight: FontWeight.w800,
-                      fontSize: 16,
+                      fontSize: 15.5,
                     ),
                   ),
                 ),

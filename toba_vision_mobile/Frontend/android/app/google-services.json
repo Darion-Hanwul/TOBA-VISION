@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1099104128",
+    "project_id": "toba-vision-47314",
+    "storage_bucket": "toba-vision-47314.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1099104128:android:5cfa3bc3ed7a3556a0cb65",
+        "android_client_info": {
+          "package_name": "com.example.toba_vision_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD5sGoJKd19E4AYhIyQgtrkEWrXt71WAEE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

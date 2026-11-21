@@ -1,13 +1,21 @@
+import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import '../../services/api_service.dart';
+import '../../services/panen_service.dart';
 import '../../widgets/app_header.dart';
 import 'finance_all_musim_screen.dart';
-import 'finance_end_screen.dart';
 import 'finance_screen_edit_upload.dart';
 
 class FinanceScreen extends StatefulWidget {
   final bool showBack;
-  const FinanceScreen({super.key, this.showBack = false});
+  final String idSiklus;
+  const FinanceScreen({
+    super.key,
+    this.showBack = false,
+    this.idSiklus = "siklus_2026_01",
+  });
 
   @override
   State<FinanceScreen> createState() => _FinanceScreenState();
@@ -15,138 +23,478 @@ class FinanceScreen extends StatefulWidget {
 
 class _FinanceScreenState extends State<FinanceScreen> {
   int _selectedPeriod = 0; // 0: Musim Ini, 1: Semua
+  bool _isLoading = false;
+  double _totalBiayaNum = 0.0;
 
   final List<String> _periods = ['Musim Ini', 'Semua'];
 
-  // Data Kategori
-  final List<Map<String, dynamic>> _categories = [
+  // Definisi Master 4 Kategori Pengeluaran (Warna, Ikon, & Nilai Awal 0)
+  final List<Map<String, dynamic>> _categoryTemplates = [
     {
       'name': 'Buruh Tani / Upah',
-      'amount': 'Rp 6,8 jt',
-      'percentage': '48%',
       'icon': Icons.groups_rounded,
       'color': const Color(0xFF065F46),
       'bg': const Color(0xFFD1FAE5),
     },
     {
       'name': 'Pupuk & Nutrisi',
-      'amount': 'Rp 3,8 jt',
-      'percentage': '27%',
       'icon': Icons.science_outlined,
       'color': const Color(0xFF4338CA),
       'bg': const Color(0xFFE0E7FF),
     },
     {
       'name': 'Bibit & Olah Lahan',
-      'amount': 'Rp 2,4 jt',
-      'percentage': '17%',
       'icon': Icons.spa_outlined,
       'color': const Color(0xFF115E59),
       'bg': const Color(0xFFCCFBF1),
     },
     {
       'name': 'Lainnya / Tambahan',
-      'amount': 'Rp 1,25 jt',
-      'percentage': '8%',
       'icon': Icons.category_outlined,
       'color': const Color(0xFF92400E),
       'bg': const Color(0xFFFEF3C7),
     },
   ];
 
-  // Data Riwayat Pengeluaran
-  final List<Map<String, dynamic>> _historyItems = [
-    {
-      'title': 'Upah Petik Daun Bawah',
-      'date': '12 Okt 2026 • 8 Pekerja',
-      'amount': '-Rp 1.200.000',
-      'icon': Icons.groups_rounded,
-      'color': const Color(0xFF065F46),
-      'bg': const Color(0xFFD1FAE5),
-    },
-    {
-      'title': 'Pupuk ZA & NPK Daun',
-      'date': '08 Okt 2026 • Toko Tani Maju',
-      'amount': '-Rp 850.000',
-      'icon': Icons.science_outlined,
-      'color': const Color(0xFF4338CA),
-      'bg': const Color(0xFFE0E7FF),
-    },
-    {
-      'title': 'Sewa Traktor Olah Tanah',
-      'date': '28 Sep 2026 • Lahan Blok A',
-      'amount': '-Rp 600.000',
-      'icon': Icons.agriculture_rounded,
-      'color': const Color(0xFF115E59),
-      'bg': const Color(0xFFCCFBF1),
-    },
-    {
-      'title': 'Beli Tali Bambu & Waring',
-      'date': '20 Sep 2026 • Perlengkapan',
-      'amount': '-Rp 350.000',
-      'icon': Icons.inventory_2_outlined,
-      'color': const Color(0xFF92400E),
-      'bg': const Color(0xFFFEF3C7),
-    },
-  ];
+  // State Dinamis Kategori & Riwayat (Dimulai dari 0 / Kosong)
+  List<Map<String, dynamic>> _categories = [];
+  List<Map<String, dynamic>> _historyItems = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _recalculateCategoriesFromHistory();
+    _loadLocalAndSyncFinansial();
+  }
+
+  /// Membaca arsip musim tertutup dari Hive untuk menentukan nomor siklus aktif & info musim terakhir
+  Map<String, dynamic> _getSeasonArchiveMeta(Box box) {
+    final rawArchive = box.get('closed_seasons_archive');
+    if (rawArchive != null && rawArchive.toString().isNotEmpty) {
+      try {
+        final List decoded = jsonDecode(rawArchive.toString());
+        if (decoded.isNotEmpty) {
+          final latestClosed = Map<String, dynamic>.from(decoded.first as Map);
+          return {
+            'activeSeasonNumber': decoded.length + 1,
+            'lastClosedSeason': latestClosed,
+          };
+        }
+      } catch (e) {
+        debugPrint('Gagal membaca arsip musim: $e');
+      }
+    }
+    return {
+      'activeSeasonNumber': 1,
+      'lastClosedSeason': null,
+    };
+  }
+
+  /// Mencocokkan nama kategori inputan user ke salah satu dari 4 pos kategori utama
+  Map<String, dynamic> _resolveCategoryStyle(String rawCategory) {
+    final lower = rawCategory.toLowerCase();
+    if (lower.contains('buruh') || lower.contains('upah') || lower.contains('petik')) {
+      return _categoryTemplates[0];
+    } else if (lower.contains('pupuk') || lower.contains('nutrisi') || lower.contains('obat')) {
+      return _categoryTemplates[1];
+    } else if (lower.contains('bibit') || lower.contains('olah') || lower.contains('lahan') || lower.contains('traktor')) {
+      return _categoryTemplates[2];
+    } else {
+      return _categoryTemplates[3];
+    }
+  }
+
+  /// Menghitung ulang Total Biaya, Nominal per Kategori, dan Persentase secara sinkron
+  void _recalculateCategoriesFromHistory() {
+    final Map<String, double> sumPerCategory = {
+      'Buruh Tani / Upah': 0.0,
+      'Pupuk & Nutrisi': 0.0,
+      'Bibit & Olah Lahan': 0.0,
+      'Lainnya / Tambahan': 0.0,
+    };
+
+    double grandTotal = 0.0;
+
+    for (final item in _historyItems) {
+      final double amt = (item['raw_amount'] as num?)?.toDouble() ?? 0.0;
+      final style = _resolveCategoryStyle((item['category'] ?? '').toString());
+      final catName = style['name'] as String;
+      sumPerCategory[catName] = (sumPerCategory[catName] ?? 0.0) + amt;
+      grandTotal += amt;
+    }
+
+    _totalBiayaNum = grandTotal;
+
+    _categories = _categoryTemplates.map((tpl) {
+      final name = tpl['name'] as String;
+      final amountVal = sumPerCategory[name] ?? 0.0;
+      final int pct = grandTotal > 0 ? ((amountVal / grandTotal) * 100).round() : 0;
+
+      return {
+        'name': name,
+        'raw_amount': amountVal,
+        'amount': _formatCompactRupiah(amountVal),
+        'percentage': '$pct%',
+        'ratio': grandTotal > 0 ? (amountVal / grandTotal) : 0.0,
+        'icon': tpl['icon'],
+        'color': tpl['color'],
+        'bg': tpl['bg'],
+      };
+    }).toList();
+  }
+
+  /// Simpan state finansial aktif ke Hive agar terbaca otomatis oleh PanenScreen (Modal)
+  Future<void> _saveActiveFinansialToHive() async {
+    try {
+      final box = Hive.isBoxOpen('toba_offline_box')
+          ? Hive.box('toba_offline_box')
+          : await Hive.openBox('toba_offline_box');
+
+      final serializedHistory = _historyItems.map((e) {
+        return {
+          'title': e['title'],
+          'date': e['date'],
+          'category': e['category'],
+          'raw_amount': e['raw_amount'],
+        };
+      }).toList();
+
+      await box.put('active_finance_history_${widget.idSiklus}', jsonEncode(serializedHistory));
+      await box.put('active_finance_total_${widget.idSiklus}', _totalBiayaNum);
+      await box.put('finance_initialized_${widget.idSiklus}', true);
+    } catch (e) {
+      debugPrint('Gagal menyimpan cache finansial lokal: $e');
+    }
+  }
+
+  // ==========================================
+  // FETCH REKAP FINANSIAL & SYNC ANTREAN OFFLINE
+  // ==========================================
+  Future<void> _loadLocalAndSyncFinansial() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final box = Hive.isBoxOpen('toba_offline_box')
+          ? Hive.box('toba_offline_box')
+          : await Hive.openBox('toba_offline_box');
+
+      final String historyKey = 'active_finance_history_${widget.idSiklus}';
+      final String initFlagKey = 'finance_initialized_${widget.idSiklus}';
+
+      // 1. Muat data lokal Hive terlebih dahulu
+      final rawJson = box.get(historyKey);
+      if (rawJson != null && rawJson.toString().isNotEmpty) {
+        final List decoded = jsonDecode(rawJson.toString());
+        _historyItems = decoded.map((e) {
+          final double amt = (e['raw_amount'] as num?)?.toDouble() ?? 0.0;
+          final cat = (e['category'] ?? 'Lainnya / Tambahan').toString();
+          final style = _resolveCategoryStyle(cat);
+          return {
+            'title': (e['title'] ?? 'Pengeluaran').toString(),
+            'date': (e['date'] ?? 'Hari ini').toString(),
+            'category': style['name'],
+            'amount': '-Rp ${_formatRupiah(amt)}',
+            'raw_amount': amt,
+            'icon': style['icon'],
+            'color': style['color'],
+            'bg': style['bg'],
+          };
+        }).toList();
+      } else {
+        _historyItems = [];
+      }
+
+      if (mounted) {
+        setState(() {
+          _recalculateCategoriesFromHistory();
+        });
+      }
+
+      // 2. Sync antrean offline yang belum terkirim ke server
+      await PanenService.syncPendingData(widget.idSiklus);
+
+      // 3. Hanya tarik dari backend JIKA aplikasi belum pernah diinisialisasi & musim belum ditutup
+      final bool isSeasonClosed = box.get('season_closed_${widget.idSiklus}', defaultValue: false);
+      final bool hasInitializedLocal = box.get(initFlagKey, defaultValue: false);
+
+      if (!isSeasonClosed && !hasInitializedLocal && rawJson == null) {
+        final res = await ApiService.getRekapFinansial(widget.idSiklus);
+        if (res != null && res['riwayat_pengeluaran'] != null) {
+          final List remoteList = res['riwayat_pengeluaran'];
+          if (remoteList.isNotEmpty) {
+            _historyItems = remoteList.map((item) {
+              final double amt = (item['jumlah_biaya'] as num?)?.toDouble() ?? 0.0;
+              final cat = (item['kategori'] ?? 'Lainnya / Tambahan').toString();
+              final style = _resolveCategoryStyle(cat);
+              return {
+                'title': (item['nama_pengeluaran'] ?? 'Pengeluaran').toString(),
+                'date': '${item['keterangan']?.toString().isNotEmpty == true ? item['keterangan'] : 'Tercatat'} • ${style['name']}',
+                'category': style['name'],
+                'amount': '-Rp ${_formatRupiah(amt)}',
+                'raw_amount': amt,
+                'icon': style['icon'],
+                'color': style['color'],
+                'bg': style['bg'],
+              };
+            }).toList();
+
+            if (mounted) {
+              setState(() {
+                _recalculateCategoriesFromHistory();
+              });
+              await _saveActiveFinansialToHive();
+            }
+          }
+        }
+        await box.put(initFlagKey, true);
+      }
+    } catch (e) {
+      debugPrint("Mode Offline / Gagal sinkronisasi backend: $e");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // Formatter Rupiah Penuh (contoh: 1.250.000)
+  String _formatRupiah(double val) {
+    String numStr = val.toInt().toString();
+    RegExp reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+    return numStr.replaceAllMapped(reg, (Match m) => '${m[1]}.');
+  }
+
+  // Formatter Rupiah Ringkas untuk Kartu Grid (contoh: Rp 0, Rp 850 rb, Rp 2,4 jt)
+  String _formatCompactRupiah(double val) {
+    if (val <= 0) return 'Rp 0';
+    if (val >= 1000000) {
+      double jt = val / 1000000.0;
+      String formatted = jt % 1 == 0
+          ? jt.toInt().toString()
+          : jt.toStringAsFixed(2).replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '').replaceAll('.', ',');
+      return 'Rp $formatted jt';
+    } else if (val >= 1000) {
+      double rb = val / 1000.0;
+      String formatted = rb % 1 == 0 ? rb.toInt().toString() : rb.toStringAsFixed(1).replaceAll('.', ',');
+      return 'Rp $formatted rb';
+    }
+    return 'Rp ${_formatRupiah(val)}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F7F5),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AppHeader(
-                showBack: widget.showBack,
-                backgroundColor: const Color(0xE6F4F7F5),
-                showBottomBorder: true,
-                trailing: AppHeaderActionButton(
-                  icon: Icons.sync_rounded,
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Sinkronisasi data keuangan berhasil diperbarui!'),
-                        duration: Duration(seconds: 2),
+    // Pastikan Hive box 'toba_offline_box' sudah terbuka sebelum mendengarkan perubahannya
+    return FutureBuilder<Box>(
+      future: Hive.isBoxOpen('toba_offline_box')
+          ? Future.value(Hive.box('toba_offline_box'))
+          : Hive.openBox('toba_offline_box'),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Scaffold(
+            backgroundColor: Color(0xFFF4F7F5),
+            body: Center(
+              child: CircularProgressIndicator(color: Color(0xFF064E3B)),
+            ),
+          );
+        }
+
+        final openedBox = snapshot.data!;
+
+        return ValueListenableBuilder(
+          valueListenable: openedBox.listenable(
+            keys: [
+              'active_finance_total_${widget.idSiklus}',
+              'closed_seasons_archive',
+            ],
+          ),
+          builder: (context, Box box, _) {
+            final double cachedTotal =
+                (box.get('active_finance_total_${widget.idSiklus}', defaultValue: 0.0) as num).toDouble();
+            if (cachedTotal == 0.0 &&
+                _totalBiayaNum > 0.0 &&
+                box.get('active_finance_history_${widget.idSiklus}') == null) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  setState(() {
+                    _historyItems.clear();
+                    _recalculateCategoriesFromHistory();
+                  });
+                }
+              });
+            }
+
+            final seasonMeta = _getSeasonArchiveMeta(box);
+            final int activeSeasonNumber = seasonMeta['activeSeasonNumber'] as int;
+            final Map<String, dynamic>? lastClosedSeason =
+                seasonMeta['lastClosedSeason'] as Map<String, dynamic>?;
+
+            return Scaffold(
+              backgroundColor: const Color(0xFFF4F7F5),
+              body: SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(bottom: 28),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AppHeader(
+                        showBack: widget.showBack,
+                        backgroundColor: const Color(0xE6F4F7F5),
+                        showBottomBorder: true,
+                        trailing: AppHeaderActionButton(
+                          icon: _isLoading ? Icons.hourglass_top_rounded : Icons.sync_rounded,
+                          onTap: () async {
+                            await _loadLocalAndSyncFinansial();
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Data keuangan berhasil diperbarui!'),
+                                duration: Duration(seconds: 2),
+                                backgroundColor: Color(0xFF047857),
+                              ),
+                            );
+                          },
+                        ),
                       ),
-                    );
-                  },
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildPageTitleSection(activeSeasonNumber),
+                            if (_totalBiayaNum == 0 && lastClosedSeason != null) ...[
+                              const SizedBox(height: 14),
+                              _buildLastClosedSeasonBanner(lastClosedSeason),
+                            ],
+                            const SizedBox(height: 16),
+                            _buildCircularSummaryCard(activeSeasonNumber),
+                            const SizedBox(height: 20),
+                            _buildExpenseCategoryGrid(),
+                            const SizedBox(height: 20),
+                            _buildPrimaryActionButton(),
+                            const SizedBox(height: 20),
+                            _buildExpenseHistoryList(),
+                            const SizedBox(height: 20),
+                            _buildAllSeasonRecapCard(),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildPageTitleSection(),
-                    const SizedBox(height: 16),
-                    _buildCircularSummaryCard(),
-                    const SizedBox(height: 20),
-                    _buildExpenseCategoryGrid(),
-                    const SizedBox(height: 20),
-                    _buildPrimaryActionButton(),
-                    const SizedBox(height: 20),
-                    _buildExpenseHistoryList(),
-                    const SizedBox(height: 20),
-                    _buildArchiveReportCard(),
-                  ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Banner info ringkasan musim terakhir yang baru ditutup (tampil saat kondisi finansial aktif = 0)
+  Widget _buildLastClosedSeasonBanner(Map<String, dynamic> lastSeason) {
+    final String seasonTitle = (lastSeason['title'] ?? 'Musim Sebelumnya').toString();
+    final String totalExpenses = (lastSeason['expenses'] ?? 'Rp 0').toString();
+    final String profitText = (lastSeason['profit'] ?? 'Rp 0').toString();
+    final double rawProfit = (lastSeason['raw_profit'] as num?)?.toDouble() ?? 0.0;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFECFDF5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFA7F3D0)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFF065F46).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.inventory_2_outlined, color: Color(0xFF065F46), size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$seasonTitle telah diarsipkan',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF064E3B),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Modal: $totalExpenses • Hasil: $profitText',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: rawProfit >= 0 ? const Color(0xFF047857) : const Color(0xFFBE123C),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: const Color(0xFF065F46),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: const BorderSide(color: Color(0xFFA7F3D0)),
+              ),
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const FinanceAllMusimScreen()),
+              );
+            },
+            child: const Text(
+              'Lihat Arsip',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPageTitleSection(int activeSeasonNumber) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: const Color(0xFFECFDF5),
+            borderRadius: BorderRadius.circular(9999),
+            border: Border.all(color: const Color(0xFFA7F3D0)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.spa_rounded, size: 13, color: Color(0xFF065F46)),
+              const SizedBox(width: 5),
+              Text(
+                'Siklus Aktif: Musim Tanam #$activeSeasonNumber',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF065F46),
                 ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  // 2. Title & Period Chips Filter
-  Widget _buildPageTitleSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+        const SizedBox(height: 8),
         const Text(
           'Biaya & Pengeluaran Kebun',
           style: TextStyle(
@@ -196,9 +544,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
                       color: isSelected ? const Color(0xFF064E3B) : Colors.white,
                       borderRadius: BorderRadius.circular(9999),
                       border: Border.all(
-                        color: isSelected
-                            ? const Color(0xFF064E3B)
-                            : const Color(0xFFE2E8F0),
+                        color: isSelected ? const Color(0xFF064E3B) : const Color(0xFFE2E8F0),
                       ),
                       boxShadow: isSelected
                           ? [
@@ -237,8 +583,11 @@ class _FinanceScreenState extends State<FinanceScreen> {
     );
   }
 
-  // 3. Circular Summary Card (Gauge Progress & Total Biaya)
-  Widget _buildCircularSummaryCard() {
+  Widget _buildCircularSummaryCard(int activeSeasonNumber) {
+    final bool hasData = _totalBiayaNum > 0;
+    final int activeCategoriesCount =
+        _categories.where((c) => ((c['raw_amount'] as num?)?.toDouble() ?? 0) > 0).length;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
@@ -256,7 +605,6 @@ class _FinanceScreenState extends State<FinanceScreen> {
       ),
       child: Column(
         children: [
-          // Circular Progress Ring Simulation
           SizedBox(
             width: 150,
             height: 150,
@@ -265,7 +613,10 @@ class _FinanceScreenState extends State<FinanceScreen> {
               children: [
                 CustomPaint(
                   size: const Size(150, 150),
-                  painter: _RingProgressPainter(),
+                  painter: _RingProgressPainter(
+                    categories: _categories,
+                    hasData: hasData,
+                  ),
                 ),
                 Column(
                   mainAxisSize: MainAxisSize.min,
@@ -273,12 +624,16 @@ class _FinanceScreenState extends State<FinanceScreen> {
                     Container(
                       width: 32,
                       height: 32,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFECFDF5),
+                      decoration: BoxDecoration(
+                        color: hasData ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC),
                         shape: BoxShape.circle,
+                        border: hasData ? null : Border.all(color: const Color(0xFFE2E8F0)),
                       ),
-                      child: const Icon(Icons.account_balance_wallet_rounded,
-                          color: Color(0xFF065F46), size: 16),
+                      child: Icon(
+                        Icons.account_balance_wallet_rounded,
+                        color: hasData ? const Color(0xFF065F46) : const Color(0xFF94A3B8),
+                        size: 16,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     const Text(
@@ -296,29 +651,31 @@ class _FinanceScreenState extends State<FinanceScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Estimasi Musim Tanam',
-            style: TextStyle(
+          Text(
+            'Estimasi Musim Tanam #$activeSeasonNumber',
+            style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
               color: Color(0xFF94A3B8),
             ),
           ),
           const SizedBox(height: 2),
-          const Text(
-            'Rp 14.250.000',
+          Text(
+            'Rp ${_formatRupiah(_totalBiayaNum)}',
             style: TextStyle(
-              fontSize: 28,
+              fontSize: 26,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.7,
-              color: Color(0xFF022C22),
+              color: hasData ? const Color(0xFF022C22) : const Color(0xFF64748B),
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Tercatat dari 4 kategori pengeluaran operasional',
+          Text(
+            hasData
+                ? 'Tercatat dari $activeCategoriesCount kategori pengeluaran operasional'
+                : 'Lembaran baru siap digunakan — belum ada pengeluaran tercatat',
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 11,
               color: Color(0xFF94A3B8),
             ),
@@ -328,14 +685,13 @@ class _FinanceScreenState extends State<FinanceScreen> {
     );
   }
 
-  // 4. Expense Category 2x2 Grid
   Widget _buildExpenseCategoryGrid() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        const Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
+          children: [
             Text(
               'Rincian Biaya',
               style: TextStyle(
@@ -367,12 +723,20 @@ class _FinanceScreenState extends State<FinanceScreen> {
           itemCount: _categories.length,
           itemBuilder: (context, index) {
             final cat = _categories[index];
+            final double rawAmt = (cat['raw_amount'] as num?)?.toDouble() ?? 0.0;
+            final bool isActive = rawAmt > 0;
+
+            final Color activeColor = cat['color'] as Color;
+            final Color activeBg = cat['bg'] as Color;
+
             return Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0x0D022C22)),
+                border: Border.all(
+                  color: isActive ? activeColor.withValues(alpha: 0.25) : const Color(0xFFE2E8F0),
+                ),
                 boxShadow: const [
                   BoxShadow(color: Color(0x0A000000), blurRadius: 2, offset: Offset(0, 1)),
                 ],
@@ -388,17 +752,21 @@ class _FinanceScreenState extends State<FinanceScreen> {
                         width: 30,
                         height: 30,
                         decoration: BoxDecoration(
-                          color: cat['bg'] as Color,
+                          color: isActive ? activeBg : const Color(0xFFF1F5F9),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(cat['icon'] as IconData, color: cat['color'] as Color, size: 16),
+                        child: Icon(
+                          cat['icon'] as IconData,
+                          color: isActive ? activeColor : const Color(0xFF94A3B8),
+                          size: 16,
+                        ),
                       ),
                       Text(
                         cat['percentage'] as String,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF94A3B8),
+                          color: isActive ? activeColor : const Color(0xFF94A3B8),
                         ),
                       ),
                     ],
@@ -422,7 +790,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
-                          color: cat['color'] as Color,
+                          color: isActive ? activeColor : const Color(0xFF94A3B8),
                         ),
                       ),
                     ],
@@ -436,7 +804,6 @@ class _FinanceScreenState extends State<FinanceScreen> {
     );
   }
 
-  // 5. Primary Action Button (Tambah Catatan Biaya)
   Widget _buildPrimaryActionButton() {
     return SizedBox(
       width: double.infinity,
@@ -457,16 +824,38 @@ class _FinanceScreenState extends State<FinanceScreen> {
           );
 
           if (result != null && mounted) {
+            final double amountVal = double.tryParse(
+                  result['amount'].toString().replaceAll(RegExp(r'[^0-9]'), ''),
+                ) ??
+                0.0;
+            final String title = result['title'] ?? 'Pengeluaran Baru';
+            final String rawCategory = result['category'] ?? 'Lainnya / Tambahan';
+            final style = _resolveCategoryStyle(rawCategory);
+            final String matchedCategoryName = style['name'] as String;
+
+            // Simpan ke Backend FastAPI / Antrean Hive
+            await PanenService.tambahBiaya(
+              idSiklus: widget.idSiklus,
+              namaPengeluaran: title,
+              kategori: matchedCategoryName,
+              jumlahBiaya: amountVal,
+            );
+
             setState(() {
               _historyItems.insert(0, {
-                'title': result['title'] ?? 'Pengeluaran Baru',
-                'date': '${result['date']} • ${result['category']}',
-                'amount': result['amount'] ?? '-Rp 0',
-                'icon': Icons.receipt_long_rounded,
-                'color': const Color(0xFF065F46),
-                'bg': const Color(0xFFD1FAE5),
+                'title': title,
+                'date': '${result['date'] ?? "Hari ini"} • $matchedCategoryName',
+                'category': matchedCategoryName,
+                'amount': '-Rp ${_formatRupiah(amountVal)}',
+                'raw_amount': amountVal,
+                'icon': style['icon'],
+                'color': style['color'],
+                'bg': style['bg'],
               });
+              _recalculateCategoriesFromHistory();
             });
+
+            await _saveActiveFinansialToHive();
           }
         },
         icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
@@ -478,7 +867,6 @@ class _FinanceScreenState extends State<FinanceScreen> {
     );
   }
 
-  // 6. Expense History List (Riwayat Catatan Pengeluaran)
   Widget _buildExpenseHistoryList() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -497,131 +885,181 @@ class _FinanceScreenState extends State<FinanceScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFFECFDF5),
+                color: _historyItems.isNotEmpty ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Text(
-                'Terbaru',
+              child: Text(
+                _historyItems.isNotEmpty ? '${_historyItems.length} Catatan' : 'Kosong',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF065F46),
+                  color: _historyItems.isNotEmpty ? const Color(0xFF065F46) : const Color(0xFF64748B),
                 ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _historyItems.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 10),
-          itemBuilder: (context, index) {
-            final item = _historyItems[index];
-            return Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0x0D022C22)),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x0A000000), blurRadius: 2, offset: Offset(0, 1)),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: item['bg'] as Color,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(item['icon'] as IconData, color: item['color'] as Color, size: 18),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item['title'] as String,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF1E293B),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              item['date'] as String,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF94A3B8),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        item['amount'] as String,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF064E3B),
-                        ),
-                      ),
-                    ],
+        if (_historyItems.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: const Column(
+              children: [
+                Icon(Icons.receipt_long_outlined, size: 32, color: Color(0xFF94A3B8)),
+                SizedBox(height: 8),
+                Text(
+                  'Belum ada riwayat pengeluaran',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF475569),
                   ),
-                  const SizedBox(height: 10),
-                  const Divider(height: 1, color: Color(0xFFF8FAFC)),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      _buildMiniButton(
-                        label: 'Edit',
-                        icon: Icons.edit_outlined,
-                        bg: const Color(0xFFF8FAFC),
-                        fg: const Color(0xFF334155),
-                        border: const Color(0xFFE2E8F0),
-                        onTap: () async {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => FinanceScreenEditUpload(
-                                initialData: item,
-                              ),
-                            ),
-                          );
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Tekan tombol "Tambah Catatan Biaya" di atas untuk mulai mencatat pengeluaran musim ini.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                ),
+              ],
+            ),
+          )
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _historyItems.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 10),
+            itemBuilder: (context, index) {
+              final item = _historyItems[index];
+              final Color itemColor = item['color'] as Color;
+              final Color itemBg = item['bg'] as Color;
 
-                          if (result != null && mounted) {
-                            setState(() {
-                              item['title'] = result['title'];
-                              item['amount'] = result['amount'];
-                            });
-                          }
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      _buildMiniButton(
-                        label: 'Hapus',
-                        icon: Icons.delete_outline_rounded,
-                        bg: const Color(0xFFFFF1F2),
-                        fg: const Color(0xFFBE123C),
-                        border: const Color(0xFFFFE4E6),
-                        onTap: () => _confirmDeleteItem(index, item),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
+              return Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0x0D022C22)),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x0A000000), blurRadius: 2, offset: Offset(0, 1)),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: itemBg,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(item['icon'] as IconData, color: itemColor, size: 18),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item['title'] as String,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                item['date'] as String,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF94A3B8),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          item['amount'] as String,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: itemColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    const Divider(height: 1, color: Color(0xFFF8FAFC)),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        _buildMiniButton(
+                          label: 'Edit',
+                          icon: Icons.edit_outlined,
+                          bg: const Color(0xFFF8FAFC),
+                          fg: const Color(0xFF334155),
+                          border: const Color(0xFFE2E8F0),
+                          onTap: () async {
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => FinanceScreenEditUpload(
+                                  initialData: item,
+                                ),
+                              ),
+                            );
+
+                            if (result != null && mounted) {
+                              final double updatedAmt = double.tryParse(
+                                    result['amount'].toString().replaceAll(RegExp(r'[^0-9]'), ''),
+                                  ) ??
+                                  (item['raw_amount'] as num).toDouble();
+                              final String updatedCat = result['category'] ?? item['category'];
+                              final style = _resolveCategoryStyle(updatedCat);
+
+                              setState(() {
+                                item['title'] = result['title'] ?? item['title'];
+                                item['category'] = style['name'];
+                                item['date'] = '${result['date'] ?? "Diperbarui"} • ${style['name']}';
+                                item['raw_amount'] = updatedAmt;
+                                item['amount'] = '-Rp ${_formatRupiah(updatedAmt)}';
+                                item['icon'] = style['icon'];
+                                item['color'] = style['color'];
+                                item['bg'] = style['bg'];
+                                _recalculateCategoriesFromHistory();
+                              });
+
+                              await _saveActiveFinansialToHive();
+                            }
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        _buildMiniButton(
+                          label: 'Hapus',
+                          icon: Icons.delete_outline_rounded,
+                          bg: const Color(0xFFFFF1F2),
+                          fg: const Color(0xFFBE123C),
+                          border: const Color(0xFFFFE4E6),
+                          onTap: () => _confirmDeleteItem(index, item),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
       ],
     );
   }
@@ -689,12 +1127,16 @@ class _FinanceScreenState extends State<FinanceScreen> {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
               final deletedTitle = item['title'];
               setState(() {
                 _historyItems.removeAt(index);
+                _recalculateCategoriesFromHistory();
               });
+              await _saveActiveFinansialToHive();
+
+              if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Catatan "$deletedTitle" berhasil dihapus!'),
@@ -742,14 +1184,14 @@ class _FinanceScreenState extends State<FinanceScreen> {
     );
   }
 
-  // 7. Archive / Tutup Buku Section Card
-  Widget _buildArchiveReportCard() {
+  /// Kartu Bawah: Navigasi ke Rekap Semua Musim
+  Widget _buildAllSeasonRecapCard() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFFE4E6)),
+        border: Border.all(color: const Color(0xFFD1FAE5)),
         boxShadow: const [
           BoxShadow(color: Color(0x0A000000), blurRadius: 2, offset: Offset(0, 1)),
         ],
@@ -763,10 +1205,10 @@ class _FinanceScreenState extends State<FinanceScreen> {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF1F2),
+                  color: const Color(0xFFECFDF5),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.archive_outlined, color: Color(0xFFBE123C), size: 18),
+                child: const Icon(Icons.history_edu_rounded, color: Color(0xFF065F46), size: 18),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -777,7 +1219,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'Tutup Buku Musim',
+                          'Arsip Laporan Musim',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
@@ -787,16 +1229,16 @@ class _FinanceScreenState extends State<FinanceScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFF1F2),
+                            color: const Color(0xFFECFDF5),
                             borderRadius: BorderRadius.circular(9999),
-                            border: Border.all(color: const Color(0xFFFFE4E6)),
+                            border: Border.all(color: const Color(0xFFA7F3D0)),
                           ),
                           child: const Text(
-                            'Akhir Musim',
+                            'Semua Musim',
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFFBE123C),
+                              color: Color(0xFF065F46),
                             ),
                           ),
                         ),
@@ -804,7 +1246,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      'Tutup buku pengeluaran dan simpan rekap akhir musim ini ke arsip laporan perkebunan.',
+                      'Lihat akumulasi total biaya dan riwayat pengeluaran dari seluruh musim tanam yang telah ditutup.',
                       style: TextStyle(
                         fontSize: 11,
                         height: 1.5,
@@ -819,25 +1261,25 @@ class _FinanceScreenState extends State<FinanceScreen> {
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
-            height: 38,
+            height: 40,
             child: OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFF1F2),
-                foregroundColor: const Color(0xFFBE123C),
-                side: const BorderSide(color: Color(0xFFFFE4E6)),
+                backgroundColor: const Color(0xFFECFDF5),
+                foregroundColor: const Color(0xFF065F46),
+                side: const BorderSide(color: Color(0xFFA7F3D0)),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const FinanceEndScreen(),
+                    builder: (context) => const FinanceAllMusimScreen(),
                   ),
                 );
               },
-              icon: const Icon(Icons.lock_outline_rounded, size: 16),
+              icon: const Icon(Icons.bar_chart_rounded, size: 16),
               label: const Text(
-                'Tutup Buku & Simpan Rekap',
+                'Rekap Semua Musim',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
               ),
             ),
@@ -848,54 +1290,72 @@ class _FinanceScreenState extends State<FinanceScreen> {
   }
 }
 
-// Custom Painter untuk Circular Gauge Ring Progress
 class _RingProgressPainter extends CustomPainter {
+  final List<Map<String, dynamic>> categories;
+  final bool hasData;
+
+  _RingProgressPainter({
+    required this.categories,
+    required this.hasData,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = (size.width - 24) / 2;
     const strokeWidth = 11.0;
 
+    // Default warna putih bersih + garis tepi halus saat Total Biaya = Rp 0
+    if (!hasData) {
+      final whiteFillPaint = Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth;
+
+      final subtleBorderPaint = Paint()
+        ..color = const Color(0xFFE2E8F0)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5;
+
+      canvas.drawCircle(center, radius, whiteFillPaint);
+      canvas.drawCircle(center, radius + (strokeWidth / 2), subtleBorderPaint);
+      canvas.drawCircle(center, radius - (strokeWidth / 2), subtleBorderPaint);
+      return;
+    }
+
+    // Latar track saat ada data
     final bgPaint = Paint()
-      ..color = const Color(0xFFE2E8F0)
+      ..color = const Color(0xFFF1F5F9)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
+      ..strokeWidth = strokeWidth;
 
-    final greenPaint = Paint()
-      ..color = const Color(0xFF047857)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    final indigoPaint = Paint()
-      ..color = const Color(0xFF818CF8)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    // Background Full Circle
     canvas.drawCircle(center, radius, bgPaint);
 
-    // Green Arc (Segmen Buruh Tani ~48%)
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -math.pi / 2,
-      math.pi * 1.0,
-      false,
-      greenPaint,
-    );
+    // Lukis segmen arc dinamis mengikuti proporsi & warna masing-masing kategori
+    double startAngle = -math.pi / 2;
+    for (final cat in categories) {
+      final double ratio = (cat['ratio'] as num?)?.toDouble() ?? 0.0;
+      if (ratio <= 0) continue;
 
-    // Indigo Arc (Segmen Pupuk & Nutrisi ~27%)
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      math.pi / 2,
-      math.pi * 0.55,
-      false,
-      indigoPaint,
-    );
+      final double sweepAngle = 2 * math.pi * ratio;
+      final paint = Paint()
+        ..color = cat['color'] as Color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.butt;
+
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        startAngle,
+        sweepAngle,
+        false,
+        paint,
+      );
+
+      startAngle += sweepAngle;
+    }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _RingProgressPainter oldDelegate) => true;
 }

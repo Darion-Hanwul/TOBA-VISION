@@ -1,6 +1,9 @@
+import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:toba_vision_mobile/services/offline_service.dart';
+import '../../services/api_service.dart';
 
 class DetectionScreen extends StatefulWidget {
   final VoidCallback onBack;
@@ -33,7 +36,6 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
     try {
       _cameras = await availableCameras();
       if (_cameras.isNotEmpty) {
-        // Ambil kamera belakang
         final backCamera = _cameras.firstWhere(
           (cam) => cam.lensDirection == CameraLensDirection.back,
           orElse: () => _cameras.first,
@@ -54,7 +56,6 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
         }
       }
     } catch (e) {
-      // Jika di web/desktop atau simulator tanpa sensor kamera, tetap tampil fallback gradient
       debugPrint('Kamera tidak tersedia atau akses ditolak: $e');
     }
   }
@@ -66,7 +67,6 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
     super.dispose();
   }
 
-  // Toggle Senter (Flashlight fisik)
   Future<void> _toggleFlash() async {
     if (_cameraController == null || !_cameraController!.value.isInitialized) {
       setState(() => _flashOn = !_flashOn);
@@ -87,67 +87,284 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
     }
   }
 
-  // Ambil Foto Nyata via Kamera
-  Future<void> _capturePhoto() async {
-    if (_isAnalyzing) return;
-
+  // ==========================================
+  // PROSES PREDIKSI KE FASTAPI BACKEND (WEB & MOBILE SAFE)
+  // ==========================================
+  Future<void> _processImageForAi(XFile imageFile) async {
     setState(() => _isAnalyzing = true);
 
     try {
-      String? photoPath;
-      if (_cameraController != null && _cameraController!.value.isInitialized) {
-        final xFile = await _cameraController!.takePicture();
-        photoPath = xFile.path;
-      }
+      // Baca bytes gambar untuk preview lintas platform (Web & Android/iOS)
+      final Uint8List imageBytes = await imageFile.readAsBytes();
 
-      await Future.delayed(const Duration(milliseconds: 1200));
+      // Ambil UID Petani dari sesi Hive
+      final userData = OfflineService.getUserData();
+      final String idPetani = (userData['uid']?.toString().isNotEmpty ?? false)
+          ? userData['uid'].toString()
+          : "guest_petani";
 
-      if (mounted) {
-        setState(() => _isAnalyzing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(photoPath != null
-                ? 'Foto berhasil diambil: ${photoPath.split(r'\').last.split('/').last}'
-                : 'Pemindaian daun tembakau selesai!'),
-            duration: const Duration(seconds: 2),
-            backgroundColor: const Color(0xFF047857),
-          ),
-        );
-      }
+      // Panggil ApiService ke FastAPI (/api/predict) menggunakan XFile
+      final result = await ApiService.predictTobaccoGrade(
+        imageFile: imageFile,
+        idPetani: idPetani,
+      );
+
+      if (!mounted) return;
+      setState(() => _isAnalyzing = false);
+
+      // Tampilkan Modal Dialog Hasil Prediksi
+      _showResultDialog(result, imageBytes);
     } catch (e) {
-      if (mounted) {
-        setState(() => _isAnalyzing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal mengambil gambar: $e')),
-        );
-      }
+      if (!mounted) return;
+      setState(() => _isAnalyzing = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal melakukan analisis AI: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     }
   }
 
-  // Pilih dari Galeri
-  Future<void> _pickFromGallery() async {
+  // Ambil Foto Nyata via Kamera Perangkat (dengan fallback ImagePicker)
+  Future<void> _capturePhoto() async {
     if (_isAnalyzing) return;
 
     try {
-      final picker = ImagePicker();
-      final xFile = await picker.pickImage(source: ImageSource.gallery);
-      if (xFile != null && mounted) {
-        setState(() => _isAnalyzing = true);
-        await Future.delayed(const Duration(milliseconds: 1200));
+      if (_cameraController != null && _cameraController!.value.isInitialized) {
+        final XFile xFile = await _cameraController!.takePicture();
         if (mounted) {
-          setState(() => _isAnalyzing = false);
+          await _processImageForAi(xFile);
+        }
+      } else {
+        // Fallback jika dijalankan di Web / emulator tanpa live preview camera
+        final picker = ImagePicker();
+        final XFile? xFile = await picker.pickImage(
+          source: ImageSource.camera,
+          imageQuality: 85,
+        );
+        if (xFile != null && mounted) {
+          await _processImageForAi(xFile);
+        } else if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Gambar terpilih: ${xFile.name}'),
-              duration: const Duration(seconds: 2),
-              backgroundColor: const Color(0xFF047857),
+            const SnackBar(
+              content: Text('Kamera tidak terdeteksi di perangkat ini. Gunakan tombol Galeri untuk mengunggah foto.'),
+              backgroundColor: Colors.orange,
             ),
           );
         }
       }
     } catch (e) {
-      debugPrint('Gagal memilih gambar dari galeri: $e');
+      if (mounted) {
+        setState(() => _isAnalyzing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal mengambil gambar: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     }
+  }
+
+  // Pilih Gambar dari Galeri Perangkat
+  Future<void> _pickFromGallery() async {
+    if (_isAnalyzing) return;
+
+    try {
+      final picker = ImagePicker();
+      final XFile? xFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
+      if (xFile != null && mounted) {
+        await _processImageForAi(xFile);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal memilih gambar dari galeri: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
+  String _getSaranByGrade(String grade) {
+    final g = grade.toUpperCase();
+    if (g.contains('A')) {
+      return 'Kualitas prima (Matang Optimal). Segera rajang dan jemur di bawah sinar matahari penuh untuk mempertahankan warna kuning keemasan & nilai jual tinggi.';
+    } else if (g.contains('B')) {
+      return 'Kualitas baik (Cukup Matang). Lakukan pemeraman singkat 1–2 hari sebelum perajangan agar warna daun lebih merata.';
+    } else {
+      return 'Daun terdeteksi terlalu matang / lewat panen. Pisahkan dari batch Grade A/B dan keringkan secara bertahap agar tidak mudah hancur.';
+    }
+  }
+
+  // ==========================================
+  // MODAL DIALOG HASIL PREDIKSI AI
+  // ==========================================
+  void _showResultDialog(Map<String, dynamic> resultData, Uint8List imageBytes) {
+    // Membaca response JSON FastAPI (/api/predict)
+    final data = resultData['data'] ?? resultData;
+    final String grade = (data['predicted_grade'] ?? data['grade'] ?? 'Grade B').toString();
+
+    final rawConf = data['confidence_score'] ?? data['confidence'] ?? 85.0;
+    double confidence = (rawConf is num) ? rawConf.toDouble() : double.tryParse(rawConf.toString()) ?? 85.0;
+    if (confidence <= 1.0) {
+      confidence = confidence * 100;
+    }
+
+    final String saran = (data['saran']?.toString().isNotEmpty ?? false)
+        ? data['saran'].toString()
+        : _getSaranByGrade(grade);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Row(
+                children: [
+                  Icon(Icons.verified_rounded, color: Color(0xFF047857), size: 28),
+                  SizedBox(width: 8),
+                  Text(
+                    'Hasil Analisis Mutu AI',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Preview Gambar (Image.memory) & Card Grade
+              Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.memory(
+                      imageBytes,
+                      width: 90,
+                      height: 90,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'PREDIKSI GRADE:',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        Text(
+                          grade.toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF047857),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD1FAE5),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'Akurasi: ${confidence.toStringAsFixed(1)}%',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF065F46),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Rekomendasi / Saran Panen
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.lightbulb_outline, size: 20, color: Color(0xFFD97706)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        saran,
+                        style: const TextStyle(fontSize: 13, color: Color(0xFF334155)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Tombol Tutup / Simpan
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF047857),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Selesai & Simpan Hasil', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -159,7 +376,6 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // 1. Live Camera Preview atau Fallback Simulated Background
           if (_isCameraReady && _cameraController != null)
             CameraPreview(_cameraController!)
           else ...[
@@ -186,7 +402,6 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
             ),
           ],
 
-          // 2. Vignette Dark Overlay (Top & Bottom)
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -198,7 +413,6 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
             ),
           ),
 
-          // 3. Header & Floating Info Card
           SafeArea(
             child: Column(
               children: [
@@ -208,7 +422,6 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
             ),
           ),
 
-          // 4. Central Scanner Viewfinder Area (256x288 px)
           Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -220,7 +433,6 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
             ),
           ),
 
-          // 5. Bottom Action Buttons (Galeri, Ambil Foto, Tips)
           Positioned(
             left: 20,
             right: 20,
@@ -234,8 +446,6 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
       ),
     );
   }
-
-  // --- Sub-Widgets ---
 
   Widget _buildHeader() {
     return Padding(
@@ -362,9 +572,11 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
                     ],
                   ),
                   const SizedBox(height: 2),
-                  const Text(
-                    'Arahkan kamera ke daun tembakau',
-                    style: TextStyle(
+                  Text(
+                    _isAnalyzing
+                        ? 'Sedang menganalisis daun tembakau...'
+                        : 'Arahkan kamera ke daun tembakau',
+                    style: const TextStyle(
                       color: Color(0xFF0F172A),
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
@@ -387,15 +599,15 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
                   Container(
                     width: 7,
                     height: 7,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF10B981),
+                    decoration: BoxDecoration(
+                      color: _isAnalyzing ? Colors.amber : const Color(0xFF10B981),
                       shape: BoxShape.circle,
                     ),
                   ),
                   const SizedBox(width: 5),
-                  const Text(
-                    'Siap',
-                    style: TextStyle(
+                  Text(
+                    _isAnalyzing ? 'Proses' : 'Siap',
+                    style: const TextStyle(
                       color: Color(0xFF065F46),
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -437,7 +649,6 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
           _buildCornerBracket(bottom: 1, left: 1, isTop: false, isLeft: true),
           _buildCornerBracket(bottom: 1, right: 1, isTop: false, isLeft: false),
 
-          // Laser Scanner
           AnimatedBuilder(
             animation: _animController,
             builder: (context, child) {
@@ -461,7 +672,6 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
             ),
           ),
 
-          // Simbol Daun di Tengah jika kamera belum ready
           if (!_isCameraReady)
             Center(
               child: Opacity(
@@ -529,10 +739,9 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
       children: [
         Row(
           children: [
-            // Button Galeri
             Expanded(
               child: GestureDetector(
-                onTap: _pickFromGallery,
+                onTap: _isAnalyzing ? null : _pickFromGallery,
                 child: Container(
                   height: 58,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -589,10 +798,9 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
 
             const SizedBox(width: 12),
 
-            // Button Ambil Foto (Nyata via Sensor Kamera)
             Expanded(
               child: GestureDetector(
-                onTap: _capturePhoto,
+                onTap: _isAnalyzing ? null : _capturePhoto,
                 child: Container(
                   height: 58,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -627,7 +835,7 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _isAnalyzing ? 'Memindai' : 'Ambil Foto',
+                            _isAnalyzing ? 'Memindai...' : 'Ambil Foto',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 12,
@@ -656,7 +864,6 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
 
         const SizedBox(height: 12),
 
-        // Tips Bar
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
