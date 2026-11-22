@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
 import '../data/auth_session.dart';
+import '../data/bmkg_locations.dart';
 import '../data/firestore_service.dart';
 import '../widgets/retro/blade_ornament.dart';
 import '../widgets/retro/chrome_wordmark.dart';
@@ -19,10 +20,13 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _nameController = TextEditingController();
-  final _addressController = TextEditingController();
   final _areaController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _desaController = TextEditingController(text: 'Bulu');
+  String _selectedProvinsi = 'Jawa Tengah';
+  String _selectedKabupaten = 'Temanggung';
+  String _selectedKecamatan = 'Bulu';
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   bool _isLoading = false;
@@ -30,10 +34,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _addressController.dispose();
     _areaController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _desaController.dispose();
     super.dispose();
   }
 
@@ -102,10 +106,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _handleRegister() async {
     final name = _nameController.text.trim();
-    final address = _addressController.text.trim();
     final areaStr = _areaController.text.trim();
     final password = _passwordController.text;
     final confirm = _confirmPasswordController.text;
+    final desaStr = _desaController.text.trim();
 
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -117,7 +121,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    if (password.isNotEmpty && password != confirm) {
+    if (password.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Silakan masukkan Kata Sandi (minimal 6 karakter)!'),
+          backgroundColor: AppColors.rust,
+        ),
+      );
+      return;
+    }
+
+    if (password.trim().length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Kata sandi wajib minimal 6 karakter!'),
+          backgroundColor: AppColors.rust,
+        ),
+      );
+      return;
+    }
+
+    if (password.trim() != confirm.trim()) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Konfirmasi kata sandi tidak cocok!'),
@@ -128,15 +152,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     final luas = double.tryParse(areaStr.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 1000.0;
+    final lokasiLahanFinal = desaStr.isNotEmpty
+        ? 'Desa $desaStr, Kec. $_selectedKecamatan, Kab. $_selectedKabupaten, Prov. $_selectedProvinsi'
+        : 'Kec. $_selectedKecamatan, Kab. $_selectedKabupaten, Prov. $_selectedProvinsi';
 
     setState(() => _isLoading = true);
 
     try {
       final petani = await FirestoreService.instance.daftarPetaniBaru(
         nama: name,
-        lokasiLahan: address.isEmpty ? 'Temanggung, Jawa Tengah' : address,
+        lokasiLahan: lokasiLahanFinal,
         luasLahanM2: luas,
-        password: password.isEmpty ? null : password,
+        password: password.trim(),
       );
 
       AuthSession.setSession(petani);
@@ -297,35 +324,186 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 14),
 
-                      // Field 3: Alamat Lahan / Lokasi Kebun
-                      const MicroText('ALAMAT LAHAN / LOKASI KEBUN', fontSize: 10),
+                      // Field 2: Lokasi Kebun & Wilayah Cuaca BMKG (Provinsi, Kabupaten, Kecamatan, Desa)
+                      const MicroText('1. PROVINSI KEBUN (38 PROVINSI RESMI BMKG)', fontSize: 10),
                       const SizedBox(height: 6),
                       Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(color: AppColors.ink, width: 2),
                         ),
-                        child: TextField(
-                          controller: _addressController,
-                          minLines: 2,
-                          maxLines: 3,
-                          textInputAction: TextInputAction.next,
-                          style: AppTypography.body(fontSize: 14, fontWeight: FontWeight.w700),
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            hintText: 'Nama desa, dusun, atau blok lahan kebun tembakau',
-                            prefixIcon: Padding(
-                              padding: EdgeInsets.only(bottom: 20),
-                              child: Icon(Icons.location_on_outlined, color: AppColors.ink, size: 20),
-                            ),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _selectedProvinsi,
+                            isExpanded: true,
+                            icon: const Icon(Icons.arrow_drop_down_rounded, color: AppColors.ink),
+                            style: AppTypography.body(fontSize: 13.5, fontWeight: FontWeight.w700),
+                            items: BmkgLocations.daftarProvinsi.map((p) {
+                              return DropdownMenuItem<String>(
+                                value: p,
+                                child: Text(
+                                  p == 'Jawa Tengah' ? '$p (Sentra Utama Temanggung)' : p,
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() {
+                                  _selectedProvinsi = val;
+                                  final newKabs = BmkgLocations.getKabupatenList(val);
+                                  _selectedKabupaten = newKabs.first;
+                                  final newKecs = BmkgLocations.getKecamatanList(_selectedKabupaten);
+                                  _selectedKecamatan = newKecs.first;
+                                  final newDesas = BmkgLocations.getDesaList(_selectedKecamatan);
+                                  _desaController.text = newDesas.isNotEmpty ? newDesas.first : '';
+                                });
+                              }
+                            },
                           ),
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 12),
+
+                      MicroText('2. KABUPATEN / KOTA (${BmkgLocations.getKabupatenList(_selectedProvinsi).length} WILAYAH)', fontSize: 10),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppColors.ink, width: 2),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: BmkgLocations.getKabupatenList(_selectedProvinsi).contains(_selectedKabupaten)
+                                ? _selectedKabupaten
+                                : BmkgLocations.getKabupatenList(_selectedProvinsi).first,
+                            isExpanded: true,
+                            icon: const Icon(Icons.arrow_drop_down_rounded, color: AppColors.ink),
+                            style: AppTypography.body(fontSize: 13.5, fontWeight: FontWeight.w700),
+                            items: BmkgLocations.getKabupatenList(_selectedProvinsi).map((k) {
+                              return DropdownMenuItem<String>(
+                                value: k,
+                                child: Text(
+                                  k == 'Temanggung' ? '$k (Sentra Utama Sindoro-Sumbing)' : k,
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() {
+                                  _selectedKabupaten = val;
+                                  final newKecs = BmkgLocations.getKecamatanList(val);
+                                  _selectedKecamatan = newKecs.first;
+                                  final newDesas = BmkgLocations.getDesaList(_selectedKecamatan);
+                                  _desaController.text = newDesas.isNotEmpty ? newDesas.first : '';
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      MicroText('3. KECAMATAN (${BmkgLocations.getKecamatanList(_selectedKabupaten).length} KECAMATAN)', fontSize: 10),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppColors.ink, width: 2),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: BmkgLocations.getKecamatanList(_selectedKabupaten).contains(_selectedKecamatan)
+                                ? _selectedKecamatan
+                                : BmkgLocations.getKecamatanList(_selectedKabupaten).first,
+                            isExpanded: true,
+                            icon: const Icon(Icons.arrow_drop_down_rounded, color: AppColors.ink),
+                            style: AppTypography.body(fontSize: 13.5, fontWeight: FontWeight.w700),
+                            items: BmkgLocations.getKecamatanList(_selectedKabupaten).map((kec) {
+                              return DropdownMenuItem<String>(
+                                value: kec,
+                                child: Text('Kecamatan $kec'),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() {
+                                  _selectedKecamatan = val;
+                                  final desaList = BmkgLocations.getDesaList(val);
+                                  _desaController.text = desaList.isNotEmpty ? desaList.first : '';
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
                       MicroText(
-                        '* Alamat digunakan untuk integrasi cuaca & data lahan',
+                        BmkgLocations.getDesaList(_selectedKecamatan).isNotEmpty
+                            ? '4. DESA / KELURAHAN (${BmkgLocations.getDesaList(_selectedKecamatan).length} DESA DI KEC. ${_selectedKecamatan.toUpperCase()})'
+                            : '4. DESA / KELURAHAN KEBUN',
+                        fontSize: 10,
+                      ),
+                      const SizedBox(height: 6),
+                      if (BmkgLocations.getDesaList(_selectedKecamatan).isNotEmpty) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: AppColors.ink, width: 2),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: BmkgLocations.getDesaList(_selectedKecamatan).contains(_desaController.text.trim())
+                                  ? _desaController.text.trim()
+                                  : BmkgLocations.getDesaList(_selectedKecamatan).first,
+                              isExpanded: true,
+                              icon: const Icon(Icons.arrow_drop_down_rounded, color: AppColors.ink),
+                              style: AppTypography.body(fontSize: 13.5, fontWeight: FontWeight.w700),
+                              items: BmkgLocations.getDesaList(_selectedKecamatan).map((d) {
+                                return DropdownMenuItem<String>(
+                                  value: d,
+                                  child: Text('Desa / Kel. $d'),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() => _desaController.text = val);
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                      ] else ...[
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: AppColors.ink, width: 2),
+                          ),
+                          child: TextField(
+                            controller: _desaController,
+                            textInputAction: TextInputAction.next,
+                            style: AppTypography.body(fontSize: 13.5, fontWeight: FontWeight.w700),
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              hintText: 'Contoh: Lamuk / Danurejo / Tlahap',
+                              prefixIcon: Icon(Icons.home_work_outlined, color: AppColors.ink, size: 20),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 4),
+                      const MicroText(
+                        '* Data Provinsi, Kabupaten, Kecamatan, dan Desa terhubung ke prakiraan cuaca & jadwal penjemuran BMKG',
                         fontSize: 8.5,
                         color: AppColors.muted,
                       ),

@@ -23,7 +23,7 @@ class MockWeatherRepository implements WeatherRepository {
   int _n = 0;
 
   @override
-  Future<WeatherData> getWeather() {
+  Future<WeatherData> getWeather({String? locationQuery}) {
     final alert = _n.isOdd;
     _n++;
     if (!alert) {
@@ -35,11 +35,35 @@ class MockWeatherRepository implements WeatherRepository {
         safeToDry: true,
         statusMessage: 'Aman untuk jemur\ndaun tembakau hari ini.',
         slots: [
-          WeatherSlot(time: '11:00', kind: WeatherKind.sunny, title: 'Cerah', note: 'Kering optimal', temp: 30),
+          WeatherSlot(time: '01:00', kind: WeatherKind.cloudy, title: 'Cerah Berawan', note: 'Malam tenang sejuk', temp: 22),
+          WeatherSlot(time: '04:00', kind: WeatherKind.overcast, title: 'Udara Kabur', note: 'Embun pagi dingin', temp: 21),
+          WeatherSlot(time: '07:00', kind: WeatherKind.sunny, title: 'Cerah Pagi', note: 'Mulai jemur sasak', temp: 25),
+          WeatherSlot(time: '10:00', kind: WeatherKind.sunny, title: 'Cerah Terik', note: 'Kering optimal terik', temp: 29, highlight: true),
           WeatherSlot(time: '13:00', kind: WeatherKind.rain, title: 'Hujan Lebat', note: 'Sasak harus di gudang', temp: 23, highlight: true),
           WeatherSlot(time: '16:00', kind: WeatherKind.cloudy, title: 'Gerimis Reda', note: 'Udara lembab dingin', temp: 21),
+          WeatherSlot(time: '19:00', kind: WeatherKind.cloudy, title: 'Berawan', note: 'Malam teduh', temp: 24),
+          WeatherSlot(time: '22:00', kind: WeatherKind.cloudy, title: 'Cerah Berawan', note: 'Sasak aman di gudang', temp: 23),
         ],
         tip: 'Matahari lagi terik nih, Pak! Waktu terbaik buat balik sasak tembakau biar kering merata & aroma mantap!',
+        tomorrow: WeatherData(
+          location: 'Temanggung',
+          temp: 31,
+          condition: 'Cerah Terik',
+          subCondition: 'Optimal Jemur',
+          safeToDry: true,
+          statusMessage: 'Prakiraan besok sangat aman untuk jemur tembakau.',
+          slots: [
+            WeatherSlot(time: '01:00', kind: WeatherKind.cloudy, title: 'Cerah Berawan', note: 'Malam sejuk', temp: 23),
+            WeatherSlot(time: '04:00', kind: WeatherKind.overcast, title: 'Udara Kabur', note: 'Embun pagi', temp: 22),
+            WeatherSlot(time: '07:00', kind: WeatherKind.sunny, title: 'Cerah', note: 'Siapkan sasak sejak pagi', temp: 26),
+            WeatherSlot(time: '10:00', kind: WeatherKind.sunny, title: 'Cerah Terik', note: 'Kering optimal', temp: 30, highlight: true),
+            WeatherSlot(time: '13:00', kind: WeatherKind.sunny, title: 'Cerah Terik', note: 'Puncak panas matahari', temp: 32, highlight: true),
+            WeatherSlot(time: '16:00', kind: WeatherKind.cloudy, title: 'Cerah Berawan', note: 'Angin sejuk stabil', temp: 28),
+            WeatherSlot(time: '19:00', kind: WeatherKind.cloudy, title: 'Berawan', note: 'Malam teduh', temp: 25),
+            WeatherSlot(time: '22:00', kind: WeatherKind.cloudy, title: 'Cerah Berawan', note: 'Sasak di dalam gudang', temp: 24),
+          ],
+          tip: 'Kabar baik Pak! Besok cuaca diprediksi terik seharian penuh. Manfaatkan dari jam 07:00 sampai 15:00!',
+        ),
       ));
     }
     return _fake(const WeatherData(

@@ -20,7 +20,7 @@ class ApiUserRepository implements UserRepository {
 
 class ApiWeatherRepository implements WeatherRepository {
   @override
-  Future<WeatherData> getWeather() => _todo('GET /weather');
+  Future<WeatherData> getWeather({String? locationQuery}) => _todo('GET /weather');
 }
 
 class ApiDetectionRepository implements DetectionRepository {

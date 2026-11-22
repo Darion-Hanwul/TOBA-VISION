@@ -51,14 +51,24 @@ class FirestoreService {
     if (query.docs.isNotEmpty) {
       final doc = query.docs.first;
       final data = doc.data();
-      final dbPassword = data['password'] as String?;
+      final dbPassword = (data['password'] as String?)?.trim();
 
-      // Validasi kata sandi jika akun memiliki kata sandi di database
-      if (dbPassword != null && dbPassword.isNotEmpty) {
-        if (password.trim() != dbPassword.trim()) {
-          throw Exception('KATA_SANDI_SALAH');
-        }
+      // Validasi kata sandi ketat: jika akun legacy/demo belum ada password di Firestore, default '123456'
+      final expectedPassword = (dbPassword != null && dbPassword.isNotEmpty)
+          ? dbPassword
+          : '123456';
+
+      if (password.trim() != expectedPassword) {
+        throw Exception('KATA_SANDI_SALAH');
       }
+
+      // Sinkronkan password ke Firestore jika dokumen belum menyimpannya
+      if (dbPassword == null || dbPassword.isEmpty) {
+        try {
+          await doc.reference.update({'password': expectedPassword});
+        } catch (_) {}
+      }
+
       return PetaniModel.fromMap(data, doc.id);
     }
     return null;
@@ -69,7 +79,7 @@ class FirestoreService {
     required String nama,
     required String lokasiLahan,
     required double luasLahanM2,
-    String? password,
+    required String password,
     String? noTelepon,
   }) async {
     final cleanName = nama.trim();
@@ -84,7 +94,7 @@ class FirestoreService {
     return await simpanProfilPetani(
       idPetani: newDoc.id,
       nama: cleanName,
-      password: password,
+      password: password.trim(),
       noTelepon: noTelepon,
       lokasiLahan: lokasiLahan.trim(),
       luasLahanM2: luasLahanM2,
@@ -145,6 +155,7 @@ class FirestoreService {
         'lokasi_lahan': lokasiLahan,
         'luas_lahan_m2': luasLahanM2,
         'kelompok_tani': kelompokTani,
+        if (password != null && password.trim().isNotEmpty) 'password': password.trim(),
       });
       return PetaniModel.fromMap(snapshot.data()!, idPetani);
     }
@@ -155,6 +166,17 @@ class FirestoreService {
     final doc = await _usersCol.doc(idPetani).get();
     if (!doc.exists || doc.data() == null) return null;
     return PetaniModel.fromMap(doc.data()!, idPetani);
+  }
+
+  /// Perbarui lokasi lahan / sentra perkebunan petani di Firestore
+  Future<void> updateLokasiPetani({
+    required String idPetani,
+    required String lokasiBaru,
+  }) async {
+    if (idPetani.isEmpty) return;
+    await _usersCol.doc(idPetani).set({
+      'lokasi_lahan': lokasiBaru,
+    }, SetOptions(merge: true));
   }
 
   // ====================================================================
@@ -742,7 +764,9 @@ class FirestoreService {
 
       await batch.commit();
     } else {
-      if (petSnap.data()?['password'] == null) {
+      final data = petSnap.data();
+      final pwd = (data?['password'] as String?)?.trim();
+      if (pwd == null || pwd.isEmpty) {
         await petaniRef.update({'password': '123456'});
       }
     }

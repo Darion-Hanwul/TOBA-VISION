@@ -11,6 +11,10 @@ void main() {
   });
 
   testWidgets('RegisterScreen renders fields correctly', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
     await tester.pumpWidget(
       MaterialApp(
         theme: buildTheme(),
@@ -18,16 +22,18 @@ void main() {
       ),
     );
 
-    expect(find.text('Daftar Akun Baru'), findsOneWidget);
-    expect(find.text('Nama Lengkap'), findsOneWidget);
-    expect(find.text('Alamat Lahan / Lokasi Kebun'), findsOneWidget);
-    expect(find.text('Kata Sandi'), findsOneWidget);
-    expect(find.text('Konfirmasi Kata Sandi'), findsOneWidget);
-    expect(find.text('Daftar Akun Sekarang'), findsOneWidget);
-    expect(find.text('Masuk Sekarang'), findsOneWidget);
+    expect(find.text('PENDAFTARAN MITRA BARU'), findsOneWidget);
+    expect(find.text('NAMA LENGKAP PETANI (ID UNIK AKUN)'), findsOneWidget);
+    expect(find.text('KATA SANDI'), findsOneWidget);
+    expect(find.text('KONFIRMASI KATA SANDI'), findsOneWidget);
+    expect(find.textContaining('DAFTAR AKUN SEKARANG'), findsOneWidget);
   });
 
   testWidgets('LoginScreen renders elements correctly', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
     await tester.pumpWidget(
       MaterialApp(
         theme: buildTheme(),
@@ -35,10 +41,10 @@ void main() {
       ),
     );
 
-    expect(find.text('TOBA VISION'), findsOneWidget);
-    expect(find.text('v2.4 AI'), findsOneWidget);
-    expect(find.text('Masuk ke Kebun'), findsOneWidget);
-    expect(find.text('Daftar Akun Baru'), findsOneWidget);
+    expect(find.text('TOBA VISION'), findsWidgets);
+    expect(find.text('V2.4 AI'), findsOneWidget);
+    expect(find.textContaining('MASUK KE KEBUN'), findsOneWidget);
+    expect(find.textContaining('DAFTAR AKUN BARU'), findsOneWidget);
     expect(find.text('Asisten AI Cerdas Petani Tembakau Modern'), findsOneWidget);
   });
 }

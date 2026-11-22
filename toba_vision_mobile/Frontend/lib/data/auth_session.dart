@@ -44,6 +44,12 @@ class AuthSession {
 
   static String get currentLokasi => currentPetani?.lokasiLahan ?? '';
 
+  static void updateCurrentLokasi(String lokasi) {
+    if (currentPetani != null) {
+      currentPetani = currentPetani!.copyWith(lokasiLahan: lokasi);
+    }
+  }
+
   static double get currentLuasM2 => currentPetani?.luasLahanM2 ?? 0.0;
 
   static String get currentKelompok {

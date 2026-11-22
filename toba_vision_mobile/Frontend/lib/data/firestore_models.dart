@@ -45,7 +45,7 @@ class PetaniModel {
     return {
       if (noTelepon != null) 'no_telepon': noTelepon,
       'username': username,
-      if (password != null) 'password': password,
+      'password': (password != null && password!.trim().isNotEmpty) ? password!.trim() : '123456',
       'nama': nama,
       'lokasi_lahan': lokasiLahan,
       'luas_lahan_m2': luasLahanM2,

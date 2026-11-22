@@ -7,7 +7,7 @@ abstract class UserRepository {
 }
 
 abstract class WeatherRepository {
-  Future<WeatherData> getWeather();
+  Future<WeatherData> getWeather({String? locationQuery});
 }
 
 abstract class DetectionRepository {

@@ -1,5 +1,6 @@
 import '../core/app_config.dart';
 import 'api_repositories.dart';
+import 'bmkg_weather_service.dart';
 import 'mock_repositories.dart';
 import 'repositories.dart';
 
@@ -12,15 +13,16 @@ class Services {
   static late HarvestRepository harvest;
 
   static void init() {
+    // Cuaca selalu terhubung live ke BMKG Resmi (dengan fallback offline otomatis)
+    weather = BmkgWeatherRepository();
+
     if (AppConfig.useMock) {
       user = MockUserRepository();
-      weather = MockWeatherRepository();
       detection = MockDetectionRepository();
       finance = MockFinanceRepository();
       harvest = MockHarvestRepository();
     } else {
       user = ApiUserRepository();
-      weather = ApiWeatherRepository();
       detection = ApiDetectionRepository();
       finance = ApiFinanceRepository();
       harvest = ApiHarvestRepository();

@@ -33,6 +33,8 @@ class WeatherData {
   final String statusMessage;
   final List<WeatherSlot> slots;
   final String tip;
+  final WeatherData? tomorrow;
+
   const WeatherData({
     required this.location,
     required this.temp,
@@ -42,6 +44,7 @@ class WeatherData {
     required this.statusMessage,
     required this.slots,
     required this.tip,
+    this.tomorrow,
   });
 }
 
