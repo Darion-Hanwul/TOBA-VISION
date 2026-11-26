@@ -107,7 +107,7 @@ class HomeScreen extends StatelessWidget {
               child: _buildCassetteFeatureCard(
                 trackNo: '01',
                 title: 'Deteksi AI',
-                subtitle: 'Pindai Mutu Daun',
+                subtitle: 'Grade & Siap Panen',
                 icon: Icons.document_scanner_rounded,
                 accentColor: AppColors.lime,
                 onTap: () => onNavigate(1),

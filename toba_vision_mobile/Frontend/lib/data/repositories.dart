@@ -12,7 +12,10 @@ abstract class WeatherRepository {
 
 abstract class DetectionRepository {
   /// [imagePath] = path foto dari kamera (null saat mode demo).
-  Future<DetectionResult> analyze({String? imagePath});
+  Future<DetectionResult> analyze({
+    String? imagePath,
+    TobaccoDetectionMode mode = TobaccoDetectionMode.grade,
+  });
 }
 
 abstract class FinanceRepository {

@@ -2,6 +2,9 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/theme.dart';
+import '../../data/models.dart';
+import '../../data/services.dart';
+import '../../widgets/detection_result_sheet.dart';
 import '../../widgets/retro/micro_text.dart';
 import '../../widgets/retro/trapezoid_tab_button.dart';
 
@@ -20,6 +23,7 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
   bool _isCameraReady = false;
   bool _isAnalyzing = false;
   bool _flashOn = false;
+  TobaccoDetectionMode _selectedMode = TobaccoDetectionMode.grade;
 
   @override
   void initState() {
@@ -87,45 +91,61 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
     }
   }
 
-  Future<void> _capturePhoto() async {
-    if (_isAnalyzing) return;
+  void _selectMode(TobaccoDetectionMode mode) {
+    if (_isAnalyzing || _selectedMode == mode) return;
+    setState(() => _selectedMode = mode);
+  }
+
+  Future<void> _analyzeImagePath(String photoPath) async {
+    if (!mounted) return;
+    final activeMode = _selectedMode;
     setState(() => _isAnalyzing = true);
 
     try {
-      String? photoPath;
-      if (_cameraController != null && _cameraController!.value.isInitialized) {
-        final xFile = await _cameraController!.takePicture();
-        photoPath = xFile.path;
-      }
-
-      await Future.delayed(const Duration(milliseconds: 1400));
-
-      if (mounted) {
-        setState(() => _isAnalyzing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppColors.ink,
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle_rounded, color: AppColors.lime, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    photoPath != null
-                        ? 'FOTO BERHASIL: ${photoPath.split(r'\').last.split('/').last}'
-                        : 'PEMINDAIAN DAUN SELESAI // GRADE A PRIMA',
-                    style: AppTypography.mono(fontSize: 11, color: AppColors.paper),
-                  ),
-                ),
-              ],
-            ),
-            duration: const Duration(seconds: 2),
+      final result = await Services.detection.analyze(
+        imagePath: photoPath,
+        mode: activeMode,
+      );
+      if (!mounted) return;
+      setState(() => _isAnalyzing = false);
+      await showDetectionResultSheet(context, result);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isAnalyzing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.rust,
+          content: Text(
+            'Gagal memindai daun: $e',
+            style: AppTypography.mono(fontSize: 11, color: Colors.white),
           ),
-        );
-      }
+        ),
+      );
+    }
+  }
+
+  Future<void> _capturePhoto() async {
+    if (_isAnalyzing) return;
+
+    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.ink,
+          content: Text(
+            'KAMERA BELUM AKTIF • GUNAKAN TOMBOL GALERI DI KIRI BAWAH',
+            style: AppTypography.mono(fontSize: 10.5, color: AppColors.lime),
+          ),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    try {
+      final xFile = await _cameraController!.takePicture();
+      await _analyzeImagePath(xFile.path);
     } catch (e) {
       if (mounted) {
-        setState(() => _isAnalyzing = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Gagal mengambil gambar: $e')),
         );
@@ -140,21 +160,7 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
       final picker = ImagePicker();
       final xFile = await picker.pickImage(source: ImageSource.gallery);
       if (xFile != null && mounted) {
-        setState(() => _isAnalyzing = true);
-        await Future.delayed(const Duration(milliseconds: 1400));
-        if (mounted) {
-          setState(() => _isAnalyzing = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              backgroundColor: AppColors.ink,
-              content: Text(
-                'FOTO GALERI DIPINDAI: ${xFile.name} // GRADE A',
-                style: AppTypography.mono(fontSize: 11, color: AppColors.paper),
-              ),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
+        await _analyzeImagePath(xFile.path);
       }
     } catch (e) {
       if (mounted) {
@@ -193,37 +199,44 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
               gradient: LinearGradient(
                 begin: Alignment.bottomCenter,
                 end: Alignment.topCenter,
-                colors: [Color(0xEE141414), Colors.transparent, Color(0x99141414)],
+                colors: [Color(0xEE141414), Colors.transparent, Color(0xAA141414)],
                 stops: [0.0, 0.45, 1.0],
               ),
             ),
           ),
 
-          // 3. Header
+          // 3. HUD & Kontrol Kamera Responsif (Header + Pilih Fitur + Viewfinder + Tombol Aksi)
           SafeArea(
-            child: _buildRetroHeader(),
-          ),
-
-          // 4. Central Viewfinder HUD Area (256x288 px)
-          Center(
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                _buildRetroViewfinder(),
-                const SizedBox(height: 16),
-                _buildInstructionPill(),
+                _buildRetroHeader(),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _buildModeSelector(),
+                ),
+                Expanded(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildRetroViewfinder(),
+                            const SizedBox(height: 14),
+                            _buildInstructionPill(),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 18),
+                  child: _buildBottomActions(),
+                ),
               ],
-            ),
-          ),
-
-          // 5. Bottom Actions (Unggah Galeri, Tombol Pindai AI, Info Tips)
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 20,
-            child: SafeArea(
-              top: false,
-              child: _buildBottomActions(),
             ),
           ),
         ],
@@ -233,7 +246,7 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
 
   Widget _buildRetroHeader() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -255,23 +268,24 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
             ),
           ),
 
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
+          Flexible(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
                 'PINDAI DAUN TEMBAKAU',
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: AppTypography.display(
                   fontSize: 15,
                   fontWeight: FontWeight.w900,
                   color: AppColors.paper,
                 ),
               ),
-              const SizedBox(height: 1),
-              
-            ],
+            ),
           ),
 
-          // Tombol Senter Fisik Bulat Bertepi Lime
+          // Tombol Senter Fisik Bertepi Lime
           GestureDetector(
             onTap: _toggleFlash,
             child: Container(
@@ -297,13 +311,116 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
     );
   }
 
+  /// Switcher 2 fitur deteksi AI offline agar petani mudah berganti antara Grade & Siap Panen.
+  Widget _buildModeSelector() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.ink,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.lime, width: 1.5),
+        boxShadow: const [
+          BoxShadow(color: AppColors.ink, offset: Offset(2, 2)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _modeTabItem(
+              mode: TobaccoDetectionMode.grade,
+              title: 'GRADE TEMBAKAU',
+              subtitle: 'GRADE A • B • C',
+              icon: Icons.workspace_premium_rounded,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: _modeTabItem(
+              mode: TobaccoDetectionMode.maturity,
+              title: 'SIAP PANEN',
+              subtitle: 'KEMATANGAN DAUN',
+              icon: Icons.eco_rounded,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _modeTabItem({
+    required TobaccoDetectionMode mode,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+  }) {
+    final bool active = _selectedMode == mode;
+    final Color fg = active ? AppColors.ink : AppColors.paper;
+    final Color subFg = active ? AppColors.ink.withValues(alpha: 0.78) : AppColors.lime;
+
+    return GestureDetector(
+      onTap: () => _selectMode(mode),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+        decoration: BoxDecoration(
+          color: active ? AppColors.lime : const Color(0xFF1F241B),
+          borderRadius: BorderRadius.circular(5),
+          border: Border.all(
+            color: active ? AppColors.ink : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 17, color: fg),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.mono(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w900,
+                      color: fg,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.mono(
+                      fontSize: 7.5,
+                      fontWeight: FontWeight.w700,
+                      color: subFg,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildRetroViewfinder() {
+    final bool isMaturity = _selectedMode == TobaccoDetectionMode.maturity;
+    final Color hudColor = isMaturity ? AppColors.orange : AppColors.lime;
+
     return Container(
       width: 256,
-      height: 288,
+      height: 272,
       decoration: BoxDecoration(
-        color: const Color(0x1A86D12A),
-        border: Border.all(color: AppColors.lime.withValues(alpha: 0.35), width: 1),
+        color: hudColor.withValues(alpha: 0.10),
+        border: Border.all(color: hudColor.withValues(alpha: 0.35), width: 1),
       ),
       child: Stack(
         children: [
@@ -312,16 +429,16 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
             animation: _animController,
             builder: (context, child) {
               return Positioned(
-                top: _animController.value * (288 - 4),
+                top: _animController.value * (272 - 4),
                 left: 0,
                 right: 0,
                 child: Container(
                   height: 3,
                   decoration: BoxDecoration(
-                    color: AppColors.lime,
+                    color: hudColor,
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.lime.withValues(alpha: 0.8),
+                        color: hudColor.withValues(alpha: 0.8),
                         blurRadius: 8,
                         spreadRadius: 2,
                       ),
@@ -332,28 +449,37 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
             },
           ),
 
-          // Sudut siku tebal warna lime
+          // Sudut siku tebal warna aktif
           Positioned.fill(
             child: CustomPaint(
-              painter: _HudCornerBracketsPainter(),
+              painter: _HudCornerBracketsPainter(color: hudColor),
             ),
           ),
 
-          // Teks HUD di dalam viewfinder
+          // Teks HUD di dalam viewfinder sesuai fitur yang dipilih
           Positioned(
             top: 8,
             left: 10,
-            child: const MicroText('POSISIKAN DAUN // RETICLE', fontSize: 8, color: AppColors.lime),
+            child: MicroText(
+              isMaturity
+                  ? 'MODE KEMATANGAN // SIAP PANEN'
+                  : 'MODE GRADE // MUTU DAUN A•B•C',
+              fontSize: 8,
+              color: hudColor,
+            ),
           ),
-          
         ],
       ),
     );
   }
 
   Widget _buildInstructionPill() {
+    final String text = _selectedMode == TobaccoDetectionMode.maturity
+        ? 'CEK SIAP PANEN: BELUM MATANG • MATANG • TERLALU MATANG'
+        : 'DETEKSI GRADE: FOTO 1–2 DAUN TERANG & FOKUS';
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: AppColors.paper,
         borderRadius: BorderRadius.circular(4),
@@ -364,19 +490,24 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: const [
-          Icon(Icons.info_outline_rounded, size: 14, color: AppColors.ink),
-          SizedBox(width: 6),
-          MicroText(
-            'PASTIKAN PENCAHAYAAN TERANG & DAUN FOKUS',
-            fontSize: 9,
-          ),
+        children: [
+          const Icon(Icons.info_outline_rounded, size: 14, color: AppColors.ink),
+          const SizedBox(width: 6),
+          MicroText(text, fontSize: 8.5),
         ],
       ),
     );
   }
 
   Widget _buildBottomActions() {
+    final bool isMaturity = _selectedMode == TobaccoDetectionMode.maturity;
+    final String ctaLabel;
+    if (_isAnalyzing) {
+      ctaLabel = isMaturity ? 'CEK KEMATANGAN...' : 'MEMINDAI GRADE...';
+    } else {
+      ctaLabel = isMaturity ? 'CEK KEMATANGAN' : 'PINDAI GRADE';
+    }
+
     return Row(
       children: [
         // Tombol Galeri (Kotak Tape-Deck)
@@ -401,7 +532,7 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
         // Tombol Utama Pindai AI (Trapesium Oranye)
         Expanded(
           child: TrapezoidTabButton(
-            label: _isAnalyzing ? 'MEMINDAI...' : 'PINDAI AI',
+            label: ctaLabel,
             isLoading: _isAnalyzing,
             onPressed: _capturePhoto,
           ),
@@ -412,10 +543,14 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
 }
 
 class _HudCornerBracketsPainter extends CustomPainter {
+  final Color color;
+
+  const _HudCornerBracketsPainter({this.color = AppColors.lime});
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.lime
+      ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.0;
 
@@ -439,5 +574,6 @@ class _HudCornerBracketsPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _HudCornerBracketsPainter oldDelegate) =>
+      oldDelegate.color != color;
 }

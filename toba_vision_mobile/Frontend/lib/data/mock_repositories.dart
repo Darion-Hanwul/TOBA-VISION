@@ -83,15 +83,57 @@ class MockWeatherRepository implements WeatherRepository {
   }
 }
 
-/// Hasil deteksi bergantian: pertama Grade C, lalu Grade A.
+/// Hasil deteksi bergantian sesuai mode (grade A/C atau tahap kematangan).
 class MockDetectionRepository implements DetectionRepository {
   int _n = 0;
 
   @override
-  Future<DetectionResult> analyze({String? imagePath}) {
-    final good = _n.isOdd;
-    _n++;
-    const tip = 'Posisikan helai daun di atas latar belakang netral dengan pencahayaan alami tanpa bayangan jatuh untuk menjaga akurasi 98%.';
+  Future<DetectionResult> analyze({
+    String? imagePath,
+    TobaccoDetectionMode mode = TobaccoDetectionMode.grade,
+  }) {
+    final idx = _n++;
+    const tip = 'Posisikan helai daun di atas latar belakang netral dengan pencahayaan alami tanpa bayangan jatuh untuk menjaga akurasi optimal.';
+
+    if (mode == TobaccoDetectionMode.maturity) {
+      final step = idx % 3;
+      if (step == 0) {
+        return _fake(const DetectionResult(
+          mode: TobaccoDetectionMode.maturity,
+          grade: '1',
+          gradeName: 'BELUM MATANG (MASIH MUDA)',
+          badge: 'KEMATANGAN // BELUM MATANG (MASIH MUDA)',
+          title: 'Belum Matang (Masih Muda)',
+          description: 'Daun masih hijau muda dan belum mencapai puncak kematangan panen. Tunggu beberapa hari hingga warna daun mulai menguning kehijauan.',
+          photoTip: tip,
+          rawLabel: 'Immature',
+        ));
+      }
+      if (step == 1) {
+        return _fake(const DetectionResult(
+          mode: TobaccoDetectionMode.maturity,
+          grade: '2',
+          gradeName: 'MATANG',
+          badge: 'KEMATANGAN // MATANG (SIAP PANEN)',
+          title: 'Matang — Siap Panen!',
+          description: 'Daun sudah matang optimal: warna hijau kekuningan merata dan siap dipetik sekarang.',
+          photoTip: tip,
+          rawLabel: 'Mature',
+        ));
+      }
+      return _fake(const DetectionResult(
+        mode: TobaccoDetectionMode.maturity,
+        grade: '3',
+        gradeName: 'TERLALU MATANG',
+        badge: 'KEMATANGAN // TERLALU MATANG',
+        title: 'Terlalu Matang',
+        description: 'Daun sudah melewati masa matang optimal. Segera petik dan pisahkan dari lot daun matang optimal.',
+        photoTip: tip,
+        rawLabel: 'Overripe',
+      ));
+    }
+
+    final good = idx.isOdd;
     if (good) {
       return _fake(const DetectionResult(
         grade: 'A',

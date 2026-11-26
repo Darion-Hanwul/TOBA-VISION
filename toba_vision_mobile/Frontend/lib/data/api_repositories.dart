@@ -25,8 +25,11 @@ class ApiWeatherRepository implements WeatherRepository {
 
 class ApiDetectionRepository implements DetectionRepository {
   @override
-  Future<DetectionResult> analyze({String? imagePath}) =>
-      _todo('POST /detections (multipart image)');
+  Future<DetectionResult> analyze({
+    String? imagePath,
+    TobaccoDetectionMode mode = TobaccoDetectionMode.grade,
+  }) =>
+      _todo('POST /detections (multipart image, mode=${mode.name})');
 }
 
 class ApiFinanceRepository implements FinanceRepository {

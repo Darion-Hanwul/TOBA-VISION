@@ -20,6 +20,8 @@ dependencies:
   firebase_auth: ^5.0.0
   cloud_firestore: ^5.0.0
   device_info_plus: ^13.3.0
+  tflite_flutter: ^0.12.1
+  image: ^4.13.1
 
 
 dev_dependencies:
@@ -43,3 +45,4 @@ flutter:
     - assets/branding/
     - assets/branding/icon_1024.png
     - assets/branding/icon_foreground.png
+    - assets/ml/
