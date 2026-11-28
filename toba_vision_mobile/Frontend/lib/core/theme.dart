@@ -186,3 +186,23 @@ String rupiah(int v) {
   }
   return 'Rp ${b.toString()}';
 }
+
+/// Memformat [date] ke tampilan Indonesia lengkap: "28 November 2026".
+String tanggalIndonesia(DateTime date) {
+  const bulanIndonesia = [
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember',
+  ];
+  final bulan = bulanIndonesia[(date.month - 1).clamp(0, 11)];
+  return '${date.day} $bulan ${date.year}';
+}

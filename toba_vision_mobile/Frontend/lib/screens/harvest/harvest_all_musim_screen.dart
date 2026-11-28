@@ -15,6 +15,10 @@ import 'harvest_screen.dart';
 class HarvestAllMusimScreen extends StatefulWidget {
   const HarvestAllMusimScreen({super.key});
 
+  /// Memformat tanggal ke tampilan Indonesia lengkap: "28 November 2026".
+  @visibleForTesting
+  static String formatTanggalIndonesia(DateTime date) => tanggalIndonesia(date);
+
   @override
   State<HarvestAllMusimScreen> createState() => _HarvestAllMusimScreenState();
 }
@@ -98,11 +102,15 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
           },
         ];
 
+        final createdDate = HarvestAllMusimScreen.formatTanggalIndonesia(m.tanggalMulai);
+
         loadedHistory.add({
           'idMusim': m.idMusim,
           'seasonNumber': m.nomorMusim,
           'title': m.judulMusim,
-          'period': 'Mulai ${m.tanggalMulai.day}/${m.tanggalMulai.month}/${m.tanggalMulai.year} • ${m.lokasiBlok}',
+          'createdDate': createdDate,
+          'lokasiBlok': m.lokasiBlok,
+          'period': 'Dibuat: $createdDate • ${m.lokasiBlok}',
           'weight': '${m.totalBobotPanenCache.round()} kg tembakau',
           'revenue': 'Rp ${_formatAngka(m.totalPendapatanCache)}',
           'cycles': m.status == 'SELESAI' ? '7/7 Petikan Selesai' : '${petikanList.length}/7 Petikan Terdata',
@@ -383,11 +391,32 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
                         ),
                       ],
                     ),
-                  const SizedBox(height: 4),
-                  MicroText.regular(
-                    season['period'] as String,
-                    color: AppColors.ink.withValues(alpha: 0.65),
-                    size: 10.5,
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: AppColors.ink.withValues(alpha: 0.35),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.calendar_today_rounded, size: 11, color: AppColors.ink),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: MicroText(
+                            'DIBUAT: ${(season['createdDate'] ?? season['period'] ?? '-').toString()}',
+                            fontSize: 9,
+                            color: AppColors.ink,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 10),
                   Row(
@@ -559,6 +588,12 @@ class _HarvestAllMusimScreenState extends State<HarvestAllMusimScreen> {
                 const SizedBox(height: 14),
                 const TaperedDivider(),
                 const SizedBox(height: 14),
+                _buildDetailRow(
+                  'Tanggal Dibuat',
+                  (season['createdDate'] ?? '-') as String,
+                  isBold: true,
+                ),
+                const SizedBox(height: 8),
                 _buildDetailRow('Total Hasil Bobot Panen', season['weight'] as String, isBold: true),
                 const SizedBox(height: 8),
                 _buildDetailRow('Total Pendapatan Kotor Mentah', season['revenue'] as String, isBold: true, valueColor: AppColors.limeDeep),

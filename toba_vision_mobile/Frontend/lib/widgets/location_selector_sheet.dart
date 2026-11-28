@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
 import '../data/bmkg_locations.dart';
+import 'locked_bmkg_desa_field.dart';
 import 'retro/micro_text.dart';
 
 /// Modal Bottom Sheet Retro untuk memilih lokasi resmi BMKG:
@@ -73,8 +74,9 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
       orElse: () => listKec.isNotEmpty ? listKec.first : 'Bulu',
     );
 
-    // 4. Inisialisasi Desa (Hanya isi jika memang ada sebelumnya, jangan paksa 'Bulu')
-    _desaController.text = des;
+    // 4. Inisialisasi Desa (kosongkan jika kecamatan belum punya daftar desa resmi BMKG)
+    final initialDesas = BmkgLocations.getDesaList(_selectedKecamatan);
+    _desaController.text = initialDesas.isNotEmpty ? des : '';
   }
 
   @override
@@ -87,7 +89,8 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
     final String prov = _selectedProvinsi;
     final String kab = _selectedKabupaten;
     final String kec = _selectedKecamatan;
-    final String des = _desaController.text.trim();
+    final listDesa = BmkgLocations.getDesaList(kec);
+    final String des = listDesa.isNotEmpty ? _desaController.text.trim() : '';
 
     final result = BmkgLocations.createFromComponents(
       provinsi: prov,
@@ -108,7 +111,7 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
     final listKec = BmkgLocations.getKecamatanList(_selectedKabupaten);
     final listDesa = BmkgLocations.getDesaList(_selectedKecamatan);
 
-    final activeDesa = _desaController.text.trim();
+    final activeDesa = listDesa.isNotEmpty ? _desaController.text.trim() : '';
     final matched = BmkgLocations.findMatchingLocation('$_selectedKecamatan $_selectedKabupaten');
 
     return Padding(
@@ -314,7 +317,7 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
               MicroText(
                 listDesa.isNotEmpty
                     ? '4. DESA / KELURAHAN (${listDesa.length} DESA DI KEC. ${_selectedKecamatan.toUpperCase()})'
-                    : '4. DESA / KELURAHAN',
+                    : '4. DESA / KELURAHAN (TERKUNCI)',
                 fontSize: 10,
               ),
               const SizedBox(height: 6),
@@ -389,34 +392,8 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                   }).toList(),
                 ),
               ] else ...[
-                // Input Bebas jika di luar wilayah yang sudah terindeks desa
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: AppColors.ink, width: 1.8),
-                  ),
-                  child: TextField(
-                    controller: _desaController,
-                    style: AppTypography.body(fontSize: 13.5, fontWeight: FontWeight.w700),
-                    onChanged: (_) => setState(() {}),
-                    decoration: InputDecoration(
-                      border: InputBorder.none,
-                      hintText: 'Ketik nama desa / kelurahan kebun Anda',
-                      prefixIcon: const Icon(Icons.home_work_outlined, color: AppColors.ink, size: 18),
-                      suffixIcon: _desaController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear_rounded, size: 16, color: AppColors.ink),
-                              onPressed: () {
-                                _desaController.clear();
-                                setState(() {});
-                              },
-                            )
-                          : null,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                    ),
-                  ),
-                ),
+                // Terkunci jika tidak ada rekomendasi desa / kelurahan dari BMKG
+                const LockedBmkgDesaField(),
               ],
 
               const SizedBox(height: 16),

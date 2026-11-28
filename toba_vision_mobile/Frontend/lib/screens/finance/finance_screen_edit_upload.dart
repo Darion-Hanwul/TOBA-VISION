@@ -22,7 +22,6 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
   int _selectedCategoryIndex = 0;
   late TextEditingController _amountController;
   late TextEditingController _titleController;
-  late TextEditingController _notesController;
   late DateTime _selectedDate;
   bool _isSaving = false;
 
@@ -75,10 +74,6 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
           : (_selectedCategoryIndex == 3 ? '' : _categories[_selectedCategoryIndex]['name'] as String),
     );
 
-    _notesController = TextEditingController(
-      text: data != null && data['notes'] != null ? data['notes'].toString() : '',
-    );
-
     _selectedDate = DateTime.now();
   }
 
@@ -99,7 +94,6 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
   void dispose() {
     _amountController.dispose();
     _titleController.dispose();
-    _notesController.dispose();
     super.dispose();
   }
 
@@ -141,7 +135,7 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
         namaPengeluaran: title,
         jumlahBiaya: amount,
         tanggal: _selectedDate,
-        catatan: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+        catatan: widget.initialData?['notes']?.toString(),
       );
 
       if (mounted) {
@@ -297,29 +291,6 @@ class _FinanceScreenEditUploadState extends State<FinanceScreenEditUpload> {
                               ),
                               const Icon(Icons.calendar_today_rounded, size: 18, color: AppColors.ink),
                             ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Field Catatan
-                      const MicroText('CATATAN TAMBAHAN (OPSIONAL)', fontSize: 10),
-                      const SizedBox(height: 6),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: AppColors.ink, width: 2),
-                        ),
-                        child: TextField(
-                          controller: _notesController,
-                          minLines: 2,
-                          maxLines: 3,
-                          style: AppTypography.body(fontSize: 12),
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            hintText: 'Tuliskan rincian tambahan di sini...',
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           ),
                         ),
                       ),

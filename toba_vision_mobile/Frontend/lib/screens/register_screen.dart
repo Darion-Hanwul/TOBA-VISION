@@ -3,6 +3,7 @@ import '../core/theme.dart';
 import '../data/auth_session.dart';
 import '../data/bmkg_locations.dart';
 import '../data/firestore_service.dart';
+import '../widgets/locked_bmkg_desa_field.dart';
 import '../widgets/retro/blade_ornament.dart';
 import '../widgets/retro/chrome_wordmark.dart';
 import '../widgets/retro/micro_text.dart';
@@ -20,7 +21,6 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _nameController = TextEditingController();
-  final _areaController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _desaController = TextEditingController(text: 'Bulu');
@@ -34,7 +34,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _areaController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _desaController.dispose();
@@ -106,10 +105,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _handleRegister() async {
     final name = _nameController.text.trim();
-    final areaStr = _areaController.text.trim();
     final password = _passwordController.text;
     final confirm = _confirmPasswordController.text;
-    final desaStr = _desaController.text.trim();
+    final desaList = BmkgLocations.getDesaList(_selectedKecamatan);
+    final desaStr = desaList.isNotEmpty ? _desaController.text.trim() : '';
 
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -151,7 +150,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    final luas = double.tryParse(areaStr.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 1000.0;
     final lokasiLahanFinal = desaStr.isNotEmpty
         ? 'Desa $desaStr, Kec. $_selectedKecamatan, Kab. $_selectedKabupaten, Prov. $_selectedProvinsi'
         : 'Kec. $_selectedKecamatan, Kab. $_selectedKabupaten, Prov. $_selectedProvinsi';
@@ -162,7 +160,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final petani = await FirestoreService.instance.daftarPetaniBaru(
         nama: name,
         lokasiLahan: lokasiLahanFinal,
-        luasLahanM2: luas,
+        luasLahanM2: 0.0,
         password: password.trim(),
       );
 
@@ -209,6 +207,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final listDesa = BmkgLocations.getDesaList(_selectedKecamatan);
     final passwordMatch = _passwordController.text.isNotEmpty &&
         _passwordController.text == _confirmPasswordController.text;
 
@@ -226,7 +225,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               children: [
                 // Header Navigasi Kembali & Wordmark
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
@@ -247,7 +245,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                       ),
                     ),
-                    const MicroText('REGISTRATION // TAPE-FORM', fontSize: 8.5),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -256,42 +253,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 10),
                 const TaperedDivider(centerLabel: 'PENDAFTARAN MITRA BARU'),
-
-                // Strip Keamanan Data Offline
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.paper,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: AppColors.ink, width: 1.5),
-                    boxShadow: const [
-                      BoxShadow(color: AppColors.ink, offset: Offset(2, 2)),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.shield_outlined, size: 20, color: AppColors.forest),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Data akun tersimpan aman dan terenkripsi.',
-                          style: AppTypography.mono(
-                            fontSize: 10,
-                            color: AppColors.ink,
-                            fontWeight: FontWeight.w700,
-                            height: 1.3,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
                 const SizedBox(height: 14),
 
                 // Form Registrasi
                 RetroCard(
                   tapeTag: 'FORMULIR PETANI // BARU',
-                  rightTag: 'TB-REG-2026',
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -445,13 +411,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       const SizedBox(height: 12),
 
                       MicroText(
-                        BmkgLocations.getDesaList(_selectedKecamatan).isNotEmpty
-                            ? '4. DESA / KELURAHAN (${BmkgLocations.getDesaList(_selectedKecamatan).length} DESA DI KEC. ${_selectedKecamatan.toUpperCase()})'
-                            : '4. DESA / KELURAHAN KEBUN',
+                        listDesa.isNotEmpty
+                            ? '4. DESA / KELURAHAN (${listDesa.length} DESA DI KEC. ${_selectedKecamatan.toUpperCase()})'
+                            : '4. DESA / KELURAHAN (TERKUNCI)',
                         fontSize: 10,
                       ),
                       const SizedBox(height: 6),
-                      if (BmkgLocations.getDesaList(_selectedKecamatan).isNotEmpty) ...[
+                      if (listDesa.isNotEmpty) ...[
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           decoration: BoxDecoration(
@@ -461,13 +427,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
-                              value: BmkgLocations.getDesaList(_selectedKecamatan).contains(_desaController.text.trim())
+                              value: listDesa.contains(_desaController.text.trim())
                                   ? _desaController.text.trim()
-                                  : BmkgLocations.getDesaList(_selectedKecamatan).first,
+                                  : listDesa.first,
                               isExpanded: true,
                               icon: const Icon(Icons.arrow_drop_down_rounded, color: AppColors.ink),
                               style: AppTypography.body(fontSize: 13.5, fontWeight: FontWeight.w700),
-                              items: BmkgLocations.getDesaList(_selectedKecamatan).map((d) {
+                              items: listDesa.map((d) {
                                 return DropdownMenuItem<String>(
                                   value: d,
                                   child: Text('Desa / Kel. $d'),
@@ -482,73 +448,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                         ),
                       ] else ...[
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: AppColors.ink, width: 2),
-                          ),
-                          child: TextField(
-                            controller: _desaController,
-                            textInputAction: TextInputAction.next,
-                            style: AppTypography.body(fontSize: 13.5, fontWeight: FontWeight.w700),
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              hintText: 'Contoh: Lamuk / Danurejo / Tlahap',
-                              prefixIcon: Icon(Icons.home_work_outlined, color: AppColors.ink, size: 20),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                            ),
-                          ),
-                        ),
+                        const LockedBmkgDesaField(),
                       ],
                       const SizedBox(height: 4),
                       const MicroText(
                         '* Data Provinsi, Kabupaten, Kecamatan, dan Desa terhubung ke prakiraan cuaca & jadwal penjemuran BMKG',
                         fontSize: 8.5,
                         color: AppColors.muted,
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Field 4: Luas Lahan (Meter Persegi / m²)
-                      const MicroText('LUAS LAHAN KEBUN (METER PERSEGI / m²)', fontSize: 10),
-                      const SizedBox(height: 6),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: AppColors.ink, width: 2),
-                        ),
-                        child: Row(
-                          children: [
-                            const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 12),
-                              child: Icon(Icons.square_foot_rounded, color: AppColors.ink, size: 20),
-                            ),
-                            Expanded(
-                              child: TextField(
-                                controller: _areaController,
-                                keyboardType: TextInputType.number,
-                                textInputAction: TextInputAction.next,
-                                style: AppTypography.mono(fontSize: 14, fontWeight: FontWeight.w700),
-                                decoration: const InputDecoration(
-                                  border: InputBorder.none,
-                                  hintText: 'Contoh: 2500',
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 0, vertical: 12),
-                                ),
-                              ),
-                            ),
-                            Container(
-                              margin: const EdgeInsets.only(right: 10),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: AppColors.lime,
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: AppColors.ink, width: 1.2),
-                              ),
-                              child: const MicroText('m²', fontSize: 10),
-                            ),
-                          ],
-                        ),
                       ),
                       const SizedBox(height: 14),
 

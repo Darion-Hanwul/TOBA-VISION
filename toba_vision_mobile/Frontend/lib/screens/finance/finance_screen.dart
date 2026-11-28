@@ -650,7 +650,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
                 AppHeader(
                   showBack: widget.showBack,
                   title: 'BUKU KAS BIAYA',
-                  subtitle: 'KEUANGAN TANI // TEMANGGUNG',
+                  subtitle: '',
                   padding: EdgeInsets.zero,
                   height: null,
                   logoSize: 40,
@@ -764,7 +764,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const MicroText('PILIH PERIODE // FILTER', fontSize: 9.5),
+        const MicroText('PILIH MUSIM', fontSize: 9.5),
         const SizedBox(height: 8),
         Row(
           children: List.generate(_periods.length, (index) {

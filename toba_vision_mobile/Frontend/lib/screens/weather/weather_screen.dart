@@ -359,70 +359,12 @@ class _WeatherScreenState extends State<WeatherScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // 1. Kartu Kondisi Cuaca Utama (RetroCard Paper)
-                RetroCard(
-                  tapeTag: _selectedDay == 0
-                      ? 'LIVE WEATHER // BMKG REPUBLIK INDONESIA'
-                      : 'PREDIKSI CUACA BESOK // BMKG REPUBLIK INDONESIA',
-                  rightTag: hasRain ? 'STATUS: WASPADA HUJAN' : 'STATUS: HARI CERAH',
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${activeWeather.temp}°C',
-                                style: AppTypography.display(
-                                  fontSize: 48,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: -2,
-                                  color: AppColors.ink,
-                                ),
-                              ),
-                              Row(
-                                children: [
-                                  Text(
-                                    activeWeather.condition,
-                                    style: AppTypography.display(fontSize: 16, fontWeight: FontWeight.w800),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  MicroText('•  ${activeWeather.subCondition}', fontSize: 10, color: AppColors.muted),
-                                ],
-                              ),
-                            ],
-                          ),
-                          Container(
-                            width: 52,
-                            height: 52,
-                            decoration: BoxDecoration(
-                              color: AppColors.ink,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.ink, width: 2),
-                            ),
-                            child: Icon(
-                              _icon(activeWeather.slots.isNotEmpty ? activeWeather.slots.first.kind : WeatherKind.sunny),
-                              color: hasRain ? const Color(0xFFEF4444) : AppColors.lime,
-                              size: 30,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Kotak Analisis Jam Hujan & Mendung (Merah jika Hujan, Hijau jika Hari Cerah)
-                      _buildHourlyRainStatusBanner(
-                        context: context,
-                        isToday: _selectedDay == 0,
-                        activeWeather: activeWeather,
-                        displayLocation: displayLocation,
-                      ),
-                    ],
-                  ),
+                // Kotak Analisis Jam Hujan & Mendung (Merah jika Hujan, Hijau jika Hari Cerah)
+                _buildHourlyRainStatusBanner(
+                  context: context,
+                  isToday: _selectedDay == 0,
+                  activeWeather: activeWeather,
+                  displayLocation: displayLocation,
                 ),
                 const SizedBox(height: 14),
 
@@ -433,17 +375,19 @@ class _WeatherScreenState extends State<WeatherScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Mini Legenda Cap Kaset Retro & Indikator Scroll
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Expanded(
-                            child: MicroText(
-                              _selectedDay == 0
-                                  ? 'PRAKIRAAN CUACA TIAP 1 JAM (HARI INI)'
-                                  : 'PRAKIRAAN CUACA TIAP 1 JAM (HARI BESOK)',
-                              fontSize: 9.5,
-                            ),
+                          Row(
+                            children: [
+                              _buildRetroLegendBadge('CERAH', AppColors.lime, AppColors.ink),
+                              const SizedBox(width: 8),
+                              _buildRetroLegendBadge('MENDUNG', AppColors.orange, AppColors.paper),
+                              const SizedBox(width: 8),
+                              _buildRetroLegendBadge('HUJAN', AppColors.rust, Colors.white),
+                            ],
                           ),
-                          const SizedBox(width: 6),
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: const [
@@ -452,17 +396,6 @@ class _WeatherScreenState extends State<WeatherScreen> {
                               MicroText('SCROLL', fontSize: 8.5, color: AppColors.muted),
                             ],
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      // Mini Legenda Cap Kaset Retro
-                      Row(
-                        children: [
-                          _buildRetroLegendBadge('CERAH', AppColors.lime, AppColors.ink),
-                          const SizedBox(width: 8),
-                          _buildRetroLegendBadge('MENDUNG', AppColors.orange, AppColors.paper),
-                          const SizedBox(width: 8),
-                          _buildRetroLegendBadge('HUJAN', AppColors.rust, Colors.white),
                         ],
                       ),
                       const SizedBox(height: 8),

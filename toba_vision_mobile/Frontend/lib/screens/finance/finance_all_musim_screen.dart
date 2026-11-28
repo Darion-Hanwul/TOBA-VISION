@@ -14,6 +14,14 @@ import 'finance_screen.dart';
 class FinanceAllMusimScreen extends StatefulWidget {
   const FinanceAllMusimScreen({super.key});
 
+  /// Menentukan status selesai musim secara konsisten di header & badge kartu arsip.
+  @visibleForTesting
+  static bool isSeasonCompleted(Map<String, dynamic> season) {
+    if (season['isSelesai'] == true) return true;
+    final normalized = (season['status'] as String? ?? '').trim().toUpperCase();
+    return normalized == 'SELESAI' || normalized == 'SUDAH SELESAI';
+  }
+
   @override
   State<FinanceAllMusimScreen> createState() => _FinanceAllMusimScreenState();
 }
@@ -82,14 +90,19 @@ class _FinanceAllMusimScreenState extends State<FinanceAllMusimScreen> {
         bibitSemua += mBibit;
         lainnyaSemua += mLainnya;
 
+        final bool isSelesai = m.status.trim().toUpperCase() == 'SELESAI';
+        final createdDate = tanggalIndonesia(m.tanggalMulai);
+
         loadedHistory.add({
           'idMusim': m.idMusim,
           'seasonNumber': m.nomorMusim,
           'title': m.judulMusim,
-          'period': 'Mulai ${m.tanggalMulai.day}/${m.tanggalMulai.month}/${m.tanggalMulai.year} • ${m.lokasiBlok}',
+          'createdDate': createdDate,
+          'period': 'Dibuat: $createdDate • ${m.lokasiBlok}',
           'expenses': 'Rp ${_formatAngka(seasonTotal)}',
           'harvest': '${m.totalBobotPanenCache.toStringAsFixed(0)} kg tembakau',
-          'status': m.status == 'SELESAI' ? 'Sudah Selesai' : 'Belum Selesai',
+          'status': isSelesai ? 'Sudah Selesai' : 'Belum Selesai',
+          'isSelesai': isSelesai,
           'labor': 'Rp ${_formatAngka(mBuruh)}',
           'fertilizer': 'Rp ${_formatAngka(mPupuk)}',
           'seed': 'Rp ${_formatAngka(mBibit)}',
@@ -278,11 +291,12 @@ class _FinanceAllMusimScreenState extends State<FinanceAllMusimScreen> {
           ..._seasonHistory.asMap().entries.map((entry) {
             final index = entry.key;
             final season = entry.value;
-            final isSelesai = season['status'] == 'SELESAI' || season['status'] == 'Selesai';
+            final isSelesai = FinanceAllMusimScreen.isSeasonCompleted(season);
+            final statusLabel = isSelesai ? 'SUDAH SELESAI' : 'BELUM SELESAI';
 
             return RetroCard(
               tapeTag: 'ARSIP TAHUNAN // REKAP',
-              rightTag: season['status'] as String,
+              rightTag: statusLabel,
               margin: const EdgeInsets.only(bottom: 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -298,14 +312,39 @@ class _FinanceAllMusimScreenState extends State<FinanceAllMusimScreen> {
                       ),
                       const SizedBox(width: 8),
                       StatusChip(
-                        label: isSelesai ? 'SUDAH SELESAI' : 'BELUM SELESAI',
+                        label: statusLabel,
                         variant: isSelesai ? StatusChipVariant.dark : StatusChipVariant.orange,
                         fontSize: 8.5,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 2),
-                  MicroText(season['period'] as String, fontSize: 9.5, color: AppColors.muted),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: AppColors.ink.withValues(alpha: 0.35),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.calendar_today_rounded, size: 11, color: AppColors.ink),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: MicroText(
+                            'DIBUAT: ${(season['createdDate'] ?? season['period'] ?? '-').toString()}',
+                            fontSize: 9,
+                            color: AppColors.ink,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 8),
 
                 Row(
@@ -446,6 +485,8 @@ class _FinanceAllMusimScreenState extends State<FinanceAllMusimScreen> {
                 const SizedBox(height: 14),
 
                 // 4 Kategori Rincian Biaya Musim (Format Baris Tanpa Persen)
+                _buildDetailRow('Tanggal Dibuat:', (season['createdDate'] ?? '-') as String),
+                const SizedBox(height: 8),
                 _buildDetailRow('Buruh & Petik:', (season['labor'] ?? 'Rp 0') as String),
                 const SizedBox(height: 8),
                 _buildDetailRow('Pupuk & Nutrisi:', (season['fertilizer'] ?? 'Rp 0') as String),

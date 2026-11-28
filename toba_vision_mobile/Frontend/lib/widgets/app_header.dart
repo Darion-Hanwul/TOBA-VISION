@@ -118,13 +118,15 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
                 )
               else
                 const ChromeWordmark(fontSize: 18),
-              const SizedBox(height: 2),
-              MicroText(
-                subtitle ?? 'TEMANGGUNG, JATENG • TB-SYS',
-                fontSize: 8.5,
-                color: AppColors.muted,
-                fontWeight: FontWeight.w700,
-              ),
+              if (subtitle == null || subtitle!.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                MicroText(
+                  subtitle ?? 'TEMANGGUNG, JATENG • TB-SYS',
+                  fontSize: 8.5,
+                  color: AppColors.muted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ],
             ],
           ),
         ),

@@ -220,14 +220,7 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _buildRetroViewfinder(),
-                            const SizedBox(height: 14),
-                            _buildInstructionPill(),
-                          ],
-                        ),
+                        child: _buildRetroViewfinder(),
                       ),
                     ),
                   ),
@@ -468,32 +461,6 @@ class _DetectionScreenState extends State<DetectionScreen> with SingleTickerProv
               color: hudColor,
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInstructionPill() {
-    final String text = _selectedMode == TobaccoDetectionMode.maturity
-        ? 'CEK SIAP PANEN: BELUM MATANG • MATANG • TERLALU MATANG'
-        : 'DETEKSI GRADE: FOTO 1–2 DAUN TERANG & FOKUS';
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.paper,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: AppColors.ink, width: 1.5),
-        boxShadow: const [
-          BoxShadow(color: AppColors.ink, offset: Offset(2, 2)),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.info_outline_rounded, size: 14, color: AppColors.ink),
-          const SizedBox(width: 6),
-          MicroText(text, fontSize: 8.5),
         ],
       ),
     );

@@ -15,7 +15,8 @@ void main() {
     );
 
     expect(find.byType(TobaVisionLogo), findsOneWidget);
-    expect(find.byType(CustomPaint), findsWidgets);
+    final image = tester.widget<Image>(find.byType(Image));
+    expect((image.image as AssetImage).assetName, 'assets/branding/icon_foreground.png');
 
     final container = tester.widget<Container>(find.byType(Container).first);
     expect(container.constraints?.maxWidth, 64);

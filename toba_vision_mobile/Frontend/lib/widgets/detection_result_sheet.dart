@@ -1,10 +1,8 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../core/theme.dart';
 import '../data/models.dart';
+import '../data/tflite_runner.dart';
 import 'retro/micro_text.dart';
 import 'retro/trapezoid_tab_button.dart';
 import 'retro/vu_meter_bar.dart';
@@ -124,8 +122,7 @@ class _DetectionResultSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final visual = _visualForCode(result.grade, isMaturity: result.isMaturity);
     final bottomInset = MediaQuery.of(context).padding.bottom;
-    final hasLocalImage =
-        !kIsWeb && result.imagePath != null && File(result.imagePath!).existsSync();
+    final Widget? localImage = buildLocalFileImage(result.imagePath);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 40, 10, 10),
@@ -187,8 +184,8 @@ class _DetectionResultSheet extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (hasLocalImage) ...[
-                    _buildAnnotatedImagePreview(visual),
+                  if (localImage != null) ...[
+                    _buildAnnotatedImagePreview(visual, localImage),
                     const SizedBox(height: 12),
                   ],
                   _buildSummaryCard(visual),
@@ -216,7 +213,7 @@ class _DetectionResultSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildAnnotatedImagePreview(_GradeVisual visual) {
+  Widget _buildAnnotatedImagePreview(_GradeVisual visual, Widget localImage) {
     final String overlayTag;
     if (result.isMaturity) {
       overlayTag = 'KLASIFIKASI KEMATANGAN • ${result.gradeName.toUpperCase()}';
@@ -239,10 +236,7 @@ class _DetectionResultSheet extends StatelessWidget {
           return Stack(
             fit: StackFit.expand,
             children: [
-              Image.file(
-                File(result.imagePath!),
-                fit: BoxFit.contain,
-              ),
+              localImage,
               if (!result.isMaturity &&
                   result.hasDetections &&
                   result.imageWidth != null &&

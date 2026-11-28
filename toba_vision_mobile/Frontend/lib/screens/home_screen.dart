@@ -32,7 +32,7 @@ class HomeScreen extends StatelessWidget {
             children: [
               // 1. Header dengan Profil Action Button
               AppHeader(
-                subtitle: 'TEMANGGUNG, JATENG // POKTAN',
+                subtitle: '',
                 padding: EdgeInsets.zero,
                 height: null,
                 logoSize: 42,
@@ -105,7 +105,6 @@ class HomeScreen extends StatelessWidget {
           children: [
             Expanded(
               child: _buildCassetteFeatureCard(
-                trackNo: '01',
                 title: 'Deteksi AI',
                 subtitle: 'Grade & Siap Panen',
                 icon: Icons.document_scanner_rounded,
@@ -116,7 +115,6 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: _buildCassetteFeatureCard(
-                trackNo: '02',
                 title: 'Cuaca Kebun',
                 subtitle: 'Prakiraan & Sasak',
                 icon: Icons.wb_sunny_rounded,
@@ -131,7 +129,6 @@ class HomeScreen extends StatelessWidget {
           children: [
             Expanded(
               child: _buildCassetteFeatureCard(
-                trackNo: '03',
                 title: 'Keuangan',
                 subtitle: 'Buku Kas & Modal',
                 icon: Icons.account_balance_wallet_rounded,
@@ -142,7 +139,6 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: _buildCassetteFeatureCard(
-                trackNo: '04',
                 title: 'Panen',
                 subtitle: '7 Siklus & Timbang',
                 icon: Icons.agriculture_rounded,
@@ -157,7 +153,6 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildCassetteFeatureCard({
-    required String trackNo,
     required String title,
     required String subtitle,
     required IconData icon,
@@ -165,8 +160,6 @@ class HomeScreen extends StatelessWidget {
     required VoidCallback onTap,
   }) {
     return RetroCard(
-      tapeTag: 'TRACK $trackNo',
-      rightTag: 'TB-SYS',
       onTap: onTap,
       padding: const EdgeInsets.all(10),
       child: Column(

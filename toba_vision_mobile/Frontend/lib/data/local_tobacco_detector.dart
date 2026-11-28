@@ -1,14 +1,12 @@
-import 'dart:io';
-import 'dart:isolate';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:image/image.dart' as img;
-import 'package:tflite_flutter/tflite_flutter.dart';
 
 import 'models.dart';
 import 'repositories.dart';
+import 'tflite_runner.dart';
 
 /// Spesifikasi terpadu pemetaan kelas YOLO ke label tampilan Grade atau Kematangan Toba Vision.
 class TobaccoGradeSpec {
@@ -238,16 +236,11 @@ class LocalTobaccoDetector {
     String imagePath, {
     TobaccoDetectionMode mode = TobaccoDetectionMode.grade,
   }) async {
-    if (kIsWeb) {
-      return _webFallbackResult(mode);
+    if (kIsWeb || !isNativeTfliteSupported) {
+      return _unsupportedPlatformResult(mode);
     }
 
-    final file = File(imagePath);
-    if (!await file.exists()) {
-      throw StateError('File foto tidak ditemukan di perangkat: $imagePath');
-    }
-
-    final imageBytes = await file.readAsBytes();
+    final imageBytes = await readLocalFileBytes(imagePath);
     return analyzeImageBytes(imageBytes, imagePath: imagePath, mode: mode);
   }
 
@@ -259,24 +252,73 @@ class LocalTobaccoDetector {
     double confThreshold = defaultConfThreshold,
     double iouThreshold = defaultIouThreshold,
   }) async {
-    if (kIsWeb) {
-      return _webFallbackResult(mode);
+    if (kIsWeb || !isNativeTfliteSupported) {
+      return _unsupportedPlatformResult(mode);
     }
 
     final (modelBytes, labels) = await _loadAssets(mode);
     final tip = _modelConfigs[mode]!.photoTip;
 
     final sw = Stopwatch()..start();
-    final _IsolateInferenceOutput rawOut = await Isolate.run(() {
-      return _runInferenceInIsolate(
-        mode: mode,
-        modelBytes: modelBytes,
-        imageBytes: imageBytes,
-        labels: labels,
-        confThreshold: confThreshold,
-        iouThreshold: iouThreshold,
-      );
-    });
+    final _IsolateInferenceOutput rawOut = await runNativeTfliteInference(
+      modelBytes: modelBytes,
+      prepareInput: (inputSize) {
+        final decoded = img.decodeImage(imageBytes);
+        if (decoded == null) {
+          throw const FormatException('Gagal membaca format gambar foto.');
+        }
+        // Perbaiki rotasi kamera Android berdasarkan metadata EXIF
+        final oriented = img.bakeOrientation(decoded);
+        final pre = mode == TobaccoDetectionMode.grade
+            ? _letterboxPreprocess(oriented, inputSize)
+            : _centerCropPreprocess(oriented, inputSize);
+
+        return (
+          tensorData: pre.inputFloat32,
+          meta: (
+            inputSize: inputSize,
+            origWidth: oriented.width,
+            origHeight: oriented.height,
+            scale: pre.scale,
+            padLeft: pre.padLeft,
+            padTop: pre.padTop,
+          ),
+        );
+      },
+      parseOutput: (outputShape, outputFloats, meta) {
+        if (mode == TobaccoDetectionMode.maturity) {
+          final probs = parseYolo11Classification(
+            outputData: outputFloats,
+            labels: labels,
+          );
+          return _IsolateInferenceOutput(
+            origWidth: meta.origWidth,
+            origHeight: meta.origHeight,
+            classProbabilities: probs,
+          );
+        }
+
+        final detections = parseYolo11Detections(
+          outputData: outputFloats,
+          outputShape: outputShape,
+          labels: labels,
+          inputSize: meta.inputSize,
+          origWidth: meta.origWidth,
+          origHeight: meta.origHeight,
+          scale: meta.scale,
+          padLeft: meta.padLeft,
+          padTop: meta.padTop,
+          confThreshold: confThreshold,
+          iouThreshold: iouThreshold,
+        );
+
+        return _IsolateInferenceOutput(
+          origWidth: meta.origWidth,
+          origHeight: meta.origHeight,
+          detections: detections,
+        );
+      },
+    );
     sw.stop();
 
     if (mode == TobaccoDetectionMode.maturity) {
@@ -360,7 +402,7 @@ class LocalTobaccoDetector {
     );
   }
 
-  static DetectionResult _webFallbackResult(TobaccoDetectionMode mode) {
+  static DetectionResult _unsupportedPlatformResult(TobaccoDetectionMode mode) {
     return DetectionResult(
       mode: mode,
       grade: '-',
@@ -371,89 +413,6 @@ class LocalTobaccoDetector {
           'Inferensi AI TFLite lokal memakai native FFI Android/Mobile. Buka aplikasi di HP Android untuk memindai daun tembakau secara offline.',
       photoTip: _modelConfigs[mode]!.photoTip,
     );
-  }
-
-  /// Eksekusi sinkron di worker Isolate: decode, EXIF transpose, preprocess, TFLite invoke, & postprocess.
-  static _IsolateInferenceOutput _runInferenceInIsolate({
-    required TobaccoDetectionMode mode,
-    required Uint8List modelBytes,
-    required Uint8List imageBytes,
-    required List<String> labels,
-    required double confThreshold,
-    required double iouThreshold,
-  }) {
-    final decoded = img.decodeImage(imageBytes);
-    if (decoded == null) {
-      throw const FormatException('Gagal membaca format gambar foto.');
-    }
-
-    // Perbaiki rotasi kamera Android berdasarkan metadata EXIF
-    final oriented = img.bakeOrientation(decoded);
-    final origW = oriented.width;
-    final origH = oriented.height;
-
-    final options = InterpreterOptions()..threads = 4;
-    final interpreter = Interpreter.fromBuffer(modelBytes, options: options);
-    try {
-      final inputTensor = interpreter.getInputTensor(0);
-      final outputTensor = interpreter.getOutputTensor(0);
-      final inputShape = inputTensor.shape; // Umumnya [1, 640, 640, 3]
-      final outputShape = outputTensor.shape; // Detect: [1, 7, 8400], Classify: [1, 3]
-
-      final int inputHeight = inputShape.length >= 3 ? inputShape[1] : 640;
-      final int inputWidth = inputShape.length >= 3 ? inputShape[2] : 640;
-      final int inputSize = math.min(inputHeight, inputWidth);
-
-      final pre = mode == TobaccoDetectionMode.grade
-          ? _letterboxPreprocess(oriented, inputSize)
-          : _centerCropPreprocess(oriented, inputSize);
-
-      // Salin flat Float32List langsung ke memori C tensor (tanpa alokasi list 4D berat)
-      inputTensor.data = pre.inputFloat32.buffer.asUint8List(
-        pre.inputFloat32.offsetInBytes,
-        pre.inputFloat32.lengthInBytes,
-      );
-
-      interpreter.invoke();
-
-      // Salin ke buffer Uint8List baru agar terjamin 4-byte aligned untuk Float32List
-      final alignedOutBytes = Uint8List.fromList(outputTensor.data);
-      final outputFloats = alignedOutBytes.buffer.asFloat32List();
-
-      if (mode == TobaccoDetectionMode.maturity) {
-        final probs = parseYolo11Classification(
-          outputData: outputFloats,
-          labels: labels,
-        );
-        return _IsolateInferenceOutput(
-          origWidth: origW,
-          origHeight: origH,
-          classProbabilities: probs,
-        );
-      }
-
-      final detections = parseYolo11Detections(
-        outputData: outputFloats,
-        outputShape: outputShape,
-        labels: labels,
-        inputSize: inputSize,
-        origWidth: origW,
-        origHeight: origH,
-        scale: pre.scale,
-        padLeft: pre.padLeft,
-        padTop: pre.padTop,
-        confThreshold: confThreshold,
-        iouThreshold: iouThreshold,
-      );
-
-      return _IsolateInferenceOutput(
-        origWidth: origW,
-        origHeight: origH,
-        detections: detections,
-      );
-    } finally {
-      interpreter.close();
-    }
   }
 
   /// Resize proporsional (letterbox 114/255) ke inputSize x inputSize NHWC Float32 [0..1] untuk Detection.

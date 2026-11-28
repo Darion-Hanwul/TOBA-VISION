@@ -2,13 +2,10 @@ import 'package:flutter/material.dart';
 import '../core/theme.dart';
 import '../data/auth_session.dart';
 import '../data/firestore_service.dart';
-import '../widgets/app_logo.dart';
-import '../widgets/retro/blade_ornament.dart';
 import '../widgets/retro/chrome_wordmark.dart';
 import '../widgets/retro/micro_text.dart';
 import '../widgets/retro/retro_card.dart';
 import '../widgets/retro/retro_frame.dart';
-import '../widgets/retro/status_chip.dart';
 import '../widgets/retro/trapezoid_tab_button.dart';
 import 'register_screen.dart';
 import 'shell.dart';
@@ -143,70 +140,15 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // 1. Header Teknis Tape-Deck Ala Referensi
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
-                    MicroText('PETANI MITRA // TB-LOGIN', fontSize: 8.5),
-                    MicroText('TYPE 1 NORMAL POSITION', fontSize: 8.5),
-                  ],
-                ),
-                const SizedBox(height: 10),
+                // 1. Wordmark Aplikasi
                 const Center(
                   child: ChromeWordmark(fontSize: 22),
                 ),
-                const SizedBox(height: 12),
-                const TaperedDivider(centerLabel: 'SECURE CASSETTE SYSTEM'),
-                const SizedBox(height: 14),
+                const SizedBox(height: 18),
 
-                // 2. Kartu Brand Identity Bergaya Stiker Label Kaset
+                // 2. Form Input: Nama Petani & Kata Sandi
                 RetroCard(
-                  tapeTag: 'IDENTIFICATION // MITRA RESMI',
-                  rightTag: 'TB-2026',
-                  child: Row(
-                    children: [
-                      const TobaVisionLogo(size: 46),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: const [
-                                Text(
-                                  'TOBA VISION',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 15,
-                                    letterSpacing: 0.5,
-                                    color: AppColors.ink,
-                                  ),
-                                ),
-                                SizedBox(width: 6),
-                                StatusChip(label: 'v2.4 AI', variant: StatusChipVariant.lime, fontSize: 8),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Asisten AI Cerdas Petani Tembakau Modern',
-                              style: AppTypography.body(
-                                fontSize: 12,
-                                color: AppColors.muted,
-                                height: 1.3,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // 4. Form Input: Nama Petani & Kata Sandi
-                RetroCard(
-                  tapeTag: 'CREDENTIALS // AUTH',
-                  rightTag: 'LOCK-PASS',
+                  tapeTag: 'masukan nama dan kata sandi anda',
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -264,34 +206,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.paper,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: AppColors.ink, width: 1),
-                        ),
-                        child: Row(
-                          children: const [
-                            Icon(Icons.info_outline_rounded, size: 12, color: AppColors.muted),
-                            SizedBox(width: 4),
-                            Expanded(
-                              child: MicroText(
-                                'DEMO PETANI: Slamet Raharjo | SANDI: 123456',
-                                fontSize: 8.5,
-                                color: AppColors.muted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 20),
 
-                // 5. Tombol CTA Trapesium Oranye
+                // 3. Tombol CTA Trapesium Oranye
                 TrapezoidTabButton(
                   label: _isLoading ? 'MEMERIKSA DATA...' : 'MASUK KE KEBUN',
                   isLoading: _isLoading,

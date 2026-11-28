@@ -155,12 +155,17 @@ void main() {
       expect(find.text('GRADE TEMBAKAU'), findsOneWidget);
       expect(find.text('SIAP PANEN'), findsOneWidget);
       expect(find.text('-- PINDAI GRADE --'), findsOneWidget);
+      expect(find.text('DETEKSI GRADE: FOTO 1–2 DAUN TERANG & FOKUS'), findsNothing);
 
       await tester.tap(find.text('SIAP PANEN'));
       await tester.pump(const Duration(milliseconds: 200));
 
       expect(find.text('-- CEK KEMATANGAN --'), findsOneWidget);
       expect(find.text('MODE KEMATANGAN // SIAP PANEN'), findsOneWidget);
+      expect(
+        find.text('CEK SIAP PANEN: BELUM MATANG • MATANG • TERLALU MATANG'),
+        findsNothing,
+      );
     });
 
     testWidgets('DetectionResultSheet renders all 3 maturity scores for harvest readiness', (tester) async {

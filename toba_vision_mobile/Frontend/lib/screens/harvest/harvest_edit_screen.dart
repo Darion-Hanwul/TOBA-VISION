@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import '../../data/auth_session.dart';
+import '../../data/firestore_models.dart';
 import '../../data/firestore_service.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/retro/blade_ornament.dart';
@@ -35,9 +36,9 @@ class _HarvestEditScreenState extends State<HarvestEditScreen> {
   late int _currentStep;
   late TextEditingController _weightController;
   late TextEditingController _revenueController;
-  late TextEditingController _noteController;
   late DateTime _selectedDate;
   bool _isSaving = false;
+  Map<String, PetikanPanenModel> _savedPetikanMap = {};
 
   final List<String> _stages = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7'];
 
@@ -57,8 +58,33 @@ class _HarvestEditScreenState extends State<HarvestEditScreen> {
     _currentStep = widget.initialStep;
     _weightController = TextEditingController(text: widget.initialWeight ?? '');
     _revenueController = TextEditingController(text: widget.initialRevenue ?? '');
-    _noteController = TextEditingController(text: widget.initialNote ?? '');
     _selectedDate = DateTime.now();
+    _loadSavedPetikan();
+  }
+
+  Future<void> _loadSavedPetikan() async {
+    final idPetani = AuthSession.currentIdPetani;
+    final idMusim = AuthSession.currentIdMusim;
+    if (idPetani.isEmpty || idMusim.isEmpty) return;
+
+    try {
+      final list = await FirestoreService.instance.getDaftarPetikan(idPetani, idMusim);
+      if (!mounted) return;
+      final map = {for (final p in list) p.kodeSiklus: p};
+      final current = map[_stages[_currentStep - 1]];
+      setState(() {
+        _savedPetikanMap = map;
+        if (current != null) {
+          _selectedDate = current.tanggalPetik;
+          if (_weightController.text.isEmpty) {
+            _weightController.text = current.beratKg.round().toString();
+          }
+          if (_revenueController.text.isEmpty) {
+            _revenueController.text = current.estimasiPendapatan.round().toString();
+          }
+        }
+      });
+    } catch (_) {}
   }
 
   Future<void> _pickDate() async {
@@ -98,9 +124,16 @@ class _HarvestEditScreenState extends State<HarvestEditScreen> {
     }
     setState(() {
       _currentStep = step;
-      _weightController.clear();
-      _revenueController.clear();
-      _noteController.clear();
+      final existing = _savedPetikanMap[_stages[step - 1]];
+      if (existing != null) {
+        _weightController.text = existing.beratKg.round().toString();
+        _revenueController.text = existing.estimasiPendapatan.round().toString();
+        _selectedDate = existing.tanggalPetik;
+      } else {
+        _weightController.clear();
+        _revenueController.clear();
+        _selectedDate = DateTime.now();
+      }
     });
   }
 
@@ -108,14 +141,12 @@ class _HarvestEditScreenState extends State<HarvestEditScreen> {
   void dispose() {
     _weightController.dispose();
     _revenueController.dispose();
-    _noteController.dispose();
     super.dispose();
   }
 
   Future<void> _saveHarvestPetikan(String stageLabel) async {
     final weight = double.tryParse(_weightController.text.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
     final revenue = double.tryParse(_revenueController.text.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
-    final note = _noteController.text.trim();
     final stageCode = _stages[_currentStep - 1];
 
     setState(() => _isSaving = true);
@@ -129,7 +160,9 @@ class _HarvestEditScreenState extends State<HarvestEditScreen> {
         beratKg: weight,
         estimasiPendapatan: revenue,
         tanggalPetik: _selectedDate,
-        kondisiDaun: note.isNotEmpty ? note : null,
+        kondisiDaun: (widget.initialNote?.trim().isNotEmpty ?? false)
+            ? widget.initialNote!.trim()
+            : null,
       );
     } catch (_) {
       // offline graceful fallback
@@ -141,7 +174,6 @@ class _HarvestEditScreenState extends State<HarvestEditScreen> {
           'stage': stageCode,
           'weight': _weightController.text,
           'revenue': _revenueController.text,
-          'note': note,
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -497,37 +529,6 @@ class _HarvestEditScreenState extends State<HarvestEditScreen> {
                               ),
                               const Icon(Icons.calendar_today_outlined, size: 18, color: AppColors.ink),
                             ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Input Keterangan / Kondisi Daun
-                      MicroText.bold('KETERANGAN / KONDISI DAUN', color: AppColors.ink),
-                      const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: AppColors.ink, width: 2),
-                          boxShadow: const [
-                            BoxShadow(color: AppColors.ink, offset: Offset(2, 2)),
-                          ],
-                        ),
-                        child: TextField(
-                          controller: _noteController,
-                          minLines: 2,
-                          maxLines: 3,
-                          style: AppTypography.mono(
-                            size: 14,
-                            weight: FontWeight.w600,
-                            color: AppColors.ink,
-                          ),
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            hintText: 'Misal: Petikan pucuk daun, warna kuning merata',
-                            hintStyle: TextStyle(color: Colors.black26),
                           ),
                         ),
                       ),

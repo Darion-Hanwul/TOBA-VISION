@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 
 /// Logo resmi aplikasi TOBA VISION.
-/// 
-/// Menggambar logo vektor presisi tinggi sesuai brand identity:
-/// - Squircle background warna hijau hutan tembakau (#29543C)
-/// - Siluet daun tembakau putih minimalis bersudut 45 derajat
-/// - Garis celah urat daun (vein slit) berkontur halus
-/// - Aksen lingkaran jingga/terakota matang (#E08442) di kanan bawah
+///
+/// Menampilkan ikon aplikasi resmi (`assets/branding/icon_foreground.png` dengan
+/// latar sage `#A3AB8E`), serta fallback ke `icon_1024.png` dan vektor kustom.
 class TobaVisionLogo extends StatelessWidget {
   /// Ukuran sisi persegi logo (lebar dan tinggi sama). Default: 48.
   final double size;
@@ -14,16 +11,16 @@ class TobaVisionLogo extends StatelessWidget {
   /// Radius sudut lengkung squircle. Jika null, otomatis proporsional (0.233 * size).
   final double? borderRadius;
 
-  /// Menampilkan latar squircle hijau atau hanya siluet motifnya saja. Default: true.
+  /// Menampilkan latar squircle atau hanya siluet motifnya saja. Default: true.
   final bool showBackground;
 
-  /// Warna latar squircle. Default: Color(0xFF29543C).
+  /// Warna latar squircle. Default: Color(0xFFA3AB8E) sesuai ikon aplikasi.
   final Color backgroundColor;
 
-  /// Warna daun. Default: Colors.white.
+  /// Warna daun fallback vektor. Default: Colors.white.
   final Color leafColor;
 
-  /// Warna titik aksen jingga Sindoro. Default: Color(0xFFE08442).
+  /// Warna titik aksen jingga Sindoro fallback vektor. Default: Color(0xFFE08442).
   final Color dotColor;
 
   /// Daftar bayangan (box shadow) opsional untuk efek taktil/elevasi.
@@ -34,7 +31,7 @@ class TobaVisionLogo extends StatelessWidget {
     this.size = 48,
     this.borderRadius,
     this.showBackground = true,
-    this.backgroundColor = const Color(0xFF29543C),
+    this.backgroundColor = const Color(0xFFA3AB8E),
     this.leafColor = Colors.white,
     this.dotColor = const Color(0xFFE08442),
     this.elevation,
@@ -54,17 +51,23 @@ class TobaVisionLogo extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: Image.asset(
-        'assets/Logo.png',
+        'assets/branding/icon_foreground.png',
         width: size,
         height: size,
         fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) => CustomPaint(
-          size: Size(size, size),
-          painter: _TobaVisionLogoPainter(
-            backgroundColor: backgroundColor,
-            leafColor: leafColor,
-            dotColor: dotColor,
-            showBackground: showBackground,
+        errorBuilder: (context, error, stackTrace) => Image.asset(
+          'assets/branding/icon_1024.png',
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => CustomPaint(
+            size: Size(size, size),
+            painter: _TobaVisionLogoPainter(
+              backgroundColor: backgroundColor,
+              leafColor: leafColor,
+              dotColor: dotColor,
+              showBackground: showBackground,
+            ),
           ),
         ),
       ),

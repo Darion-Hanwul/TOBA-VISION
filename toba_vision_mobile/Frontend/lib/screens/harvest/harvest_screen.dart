@@ -15,6 +15,15 @@ import '../../widgets/retro/vu_meter_bar.dart';
 import 'harvest_all_musim_screen.dart';
 import 'harvest_edit_screen.dart';
 
+/// Menentukan apakah data petikan pada [activeStep] bersifat read-only di [HarvestScreen]
+/// (harus melalui [HarvestEditScreen] untuk diubah).
+bool isHarvestStepReadOnly({
+  required int activeStep,
+  required int unlockedStep,
+  required bool hasSavedRecord,
+}) =>
+    activeStep < unlockedStep || hasSavedRecord;
+
 class HarvestScreen extends StatefulWidget {
   final bool showBack;
   const HarvestScreen({super.key, this.showBack = false});
@@ -33,7 +42,6 @@ class _HarvestScreenState extends State<HarvestScreen> {
   DateTime _selectedDate = DateTime.now();
   final TextEditingController _weightController = TextEditingController();
   final TextEditingController _revenueController = TextEditingController();
-  final TextEditingController _noteController = TextEditingController();
 
   StreamSubscription<List<PetikanPanenModel>>? _panenSub;
   StreamSubscription<List<BiayaOperasionalModel>>? _biayaSub;
@@ -67,7 +75,6 @@ class _HarvestScreenState extends State<HarvestScreen> {
     _biayaSub?.cancel();
     _weightController.dispose();
     _revenueController.dispose();
-    _noteController.dispose();
     super.dispose();
   }
 
@@ -148,7 +155,6 @@ class _HarvestScreenState extends State<HarvestScreen> {
         _firestorePanenMap = {};
         _weightController.clear();
         _revenueController.clear();
-        _noteController.clear();
 
         for (int i = 0; i < _stages.length; i++) {
           final stageCode = _stages[i];
@@ -198,10 +204,16 @@ class _HarvestScreenState extends State<HarvestScreen> {
       _activeStep = nextStep;
       _firestorePanenMap = map;
 
-      _weightController.clear();
-      _revenueController.clear();
-      _noteController.clear();
-      _selectedDate = DateTime.now();
+      final existingNext = map[_stages[nextStep - 1]];
+      if (existingNext != null) {
+        _weightController.text = existingNext.beratKg.round().toString();
+        _revenueController.text = existingNext.estimasiPendapatan.round().toString();
+        _selectedDate = existingNext.tanggalPetik;
+      } else {
+        _weightController.clear();
+        _revenueController.clear();
+        _selectedDate = DateTime.now();
+      }
 
       for (int i = 0; i < _stages.length; i++) {
         final stageCode = _stages[i];
@@ -265,21 +277,61 @@ class _HarvestScreenState extends State<HarvestScreen> {
       if (existing != null) {
         _weightController.text = existing.beratKg.round().toString();
         _revenueController.text = existing.estimasiPendapatan.round().toString();
-        _noteController.text = existing.kondisiDaun ?? '';
         _selectedDate = existing.tanggalPetik;
       } else {
         _weightController.clear();
         _revenueController.clear();
-        _noteController.clear();
         _selectedDate = DateTime.now();
       }
     });
   }
 
+  bool get _isViewingSavedStep => isHarvestStepReadOnly(
+        activeStep: _activeStep,
+        unlockedStep: _unlockedStep,
+        hasSavedRecord: _firestorePanenMap.containsKey(_stages[_activeStep - 1]),
+      );
+
+  Future<void> _openHarvestEditScreen(int stepNum) async {
+    final stageCode = _stages[stepNum - 1];
+    final existing = _firestorePanenMap[stageCode];
+    final initWeight = existing != null
+        ? existing.beratKg.round().toString()
+        : _weightController.text;
+    final initRevenue = existing != null
+        ? existing.estimasiPendapatan.round().toString()
+        : _revenueController.text;
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => HarvestEditScreen(
+          initialStep: stepNum,
+          stageName: stageCode,
+          maxUnlockedStep: _unlockedStep,
+          initialWeight: initWeight,
+          initialRevenue: initRevenue,
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _weightController.text = result['weight'] ?? _weightController.text;
+        _revenueController.text = result['revenue'] ?? _revenueController.text;
+      });
+      _listenToHarvestFirestore();
+    }
+  }
+
   Future<void> _saveCurrentPetikan() async {
+    if (_isViewingSavedStep) {
+      await _openHarvestEditScreen(_activeStep);
+      return;
+    }
+
     final weight = double.tryParse(_weightController.text.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
     final rev = double.tryParse(_revenueController.text.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
-    final note = _noteController.text.trim();
     final stageCode = _stages[_activeStep - 1];
 
     if (_activeStep > _unlockedStep) {
@@ -313,13 +365,12 @@ class _HarvestScreenState extends State<HarvestScreen> {
         beratKg: weight,
         estimasiPendapatan: rev,
         tanggalPetik: _selectedDate,
-        kondisiDaun: note.isNotEmpty ? note : null,
+        kondisiDaun: _firestorePanenMap[stageCode]?.kondisiDaun,
       );
 
       if (mounted) {
         _weightController.clear();
         _revenueController.clear();
-        _noteController.clear();
         _listenToHarvestFirestore();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -362,7 +413,7 @@ class _HarvestScreenState extends State<HarvestScreen> {
                 AppHeader(
                   showBack: widget.showBack,
                   title: 'PANEN & HASIL PETIK',
-                  subtitle: 'LAHAN BLOK A • TEMANGGUNG',
+                  subtitle: '',
                   padding: EdgeInsets.zero,
                   height: null,
                   logoSize: 40,
@@ -748,7 +799,7 @@ class _HarvestScreenState extends State<HarvestScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const MicroText('PILIH PERIODE // SIKLUS', fontSize: 9.5),
+        const MicroText('pilih periode', fontSize: 9.5),
         const SizedBox(height: 8),
         Row(
           children: List.generate(_periods.length, (index) {
@@ -868,30 +919,7 @@ class _HarvestScreenState extends State<HarvestScreen> {
                     }
 
                     if (isActive) {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => HarvestEditScreen(
-                            initialStep: stepNum,
-                            stageName: _stages[index],
-                            maxUnlockedStep: _unlockedStep,
-                            initialWeight: _weightController.text,
-                            initialRevenue: _revenueController.text,
-                            initialNote: _noteController.text,
-                          ),
-                        ),
-                      );
-
-                      if (result != null && mounted) {
-                        setState(() {
-                          _weightController.text = result['weight'] ?? _weightController.text;
-                          _revenueController.text = result['revenue'] ?? _revenueController.text;
-                          if (result['note'] != null) {
-                            _noteController.text = result['note'];
-                          }
-                        });
-                        _listenToHarvestFirestore();
-                      }
+                      await _openHarvestEditScreen(stepNum);
                     } else {
                       _setActiveStep(stepNum);
                     }
@@ -1176,9 +1204,12 @@ class _HarvestScreenState extends State<HarvestScreen> {
   }
 
   Widget _buildWeighingInputCard() {
+    final readOnly = _isViewingSavedStep;
+    final fieldBg = readOnly ? const Color(0xFFF1F1EB) : Colors.white;
+
     return RetroCard(
       tapeTag: 'TIMBANGAN // PETIKAN P$_activeStep',
-      rightTag: 'HARI INI',
+      rightTag: readOnly ? 'TERKUNCI' : 'HARI INI',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1192,9 +1223,36 @@ class _HarvestScreenState extends State<HarvestScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              const StatusChip(label: 'HARI INI', variant: StatusChipVariant.dark, fontSize: 8),
+              StatusChip(
+                label: readOnly ? 'TERSIMPAN' : 'HARI INI',
+                variant: readOnly ? StatusChipVariant.lime : StatusChipVariant.dark,
+                fontSize: 8,
+              ),
             ],
           ),
+          if (readOnly) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: AppColors.paper,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: AppColors.ink, width: 1.2),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.lock_outline_rounded, size: 15, color: AppColors.ink),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Panen P$_activeStep sudah tercatat & tidak dapat diedit di sini. Tekan tombol Edit Petikan P$_activeStep untuk mengubah data.',
+                      style: AppTypography.body(fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
 
           // Field Berat Tembakau (kg)
@@ -1202,7 +1260,7 @@ class _HarvestScreenState extends State<HarvestScreen> {
           const SizedBox(height: 6),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: fieldBg,
               borderRadius: BorderRadius.circular(6),
               border: Border.all(color: AppColors.ink, width: 2),
             ),
@@ -1211,6 +1269,8 @@ class _HarvestScreenState extends State<HarvestScreen> {
                 Expanded(
                   child: TextField(
                     controller: _weightController,
+                    readOnly: readOnly,
+                    enableInteractiveSelection: !readOnly,
                     keyboardType: TextInputType.number,
                     style: AppTypography.mono(fontSize: 16, fontWeight: FontWeight.w900),
                     decoration: const InputDecoration(
@@ -1222,7 +1282,16 @@ class _HarvestScreenState extends State<HarvestScreen> {
                 ),
                 Padding(
                   padding: const EdgeInsets.only(right: 12),
-                  child: Text('KG', style: AppTypography.mono(fontSize: 12, fontWeight: FontWeight.w900)),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (readOnly) ...[
+                        const Icon(Icons.lock_outline_rounded, size: 14, color: AppColors.muted),
+                        const SizedBox(width: 4),
+                      ],
+                      Text('KG', style: AppTypography.mono(fontSize: 12, fontWeight: FontWeight.w900)),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1234,7 +1303,7 @@ class _HarvestScreenState extends State<HarvestScreen> {
           const SizedBox(height: 6),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: fieldBg,
               borderRadius: BorderRadius.circular(6),
               border: Border.all(color: AppColors.ink, width: 2),
             ),
@@ -1247,6 +1316,8 @@ class _HarvestScreenState extends State<HarvestScreen> {
                 Expanded(
                   child: TextField(
                     controller: _revenueController,
+                    readOnly: readOnly,
+                    enableInteractiveSelection: !readOnly,
                     keyboardType: TextInputType.number,
                     style: AppTypography.mono(fontSize: 16, fontWeight: FontWeight.w900),
                     decoration: const InputDecoration(
@@ -1256,6 +1327,11 @@ class _HarvestScreenState extends State<HarvestScreen> {
                     ),
                   ),
                 ),
+                if (readOnly)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 12),
+                    child: Icon(Icons.lock_outline_rounded, size: 14, color: AppColors.muted),
+                  ),
               ],
             ),
           ),
@@ -1265,21 +1341,23 @@ class _HarvestScreenState extends State<HarvestScreen> {
           const MicroText('TANGGAL PENIMBANGAN / PETIKAN', fontSize: 9.5),
           const SizedBox(height: 6),
           GestureDetector(
-            onTap: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: _selectedDate,
-                firstDate: DateTime(2020),
-                lastDate: DateTime(2030),
-              );
-              if (picked != null) {
-                setState(() => _selectedDate = picked);
-              }
-            },
+            onTap: readOnly
+                ? null
+                : () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedDate,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2030),
+                    );
+                    if (picked != null) {
+                      setState(() => _selectedDate = picked);
+                    }
+                  },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: fieldBg,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(color: AppColors.ink, width: 2),
               ),
@@ -1290,32 +1368,12 @@ class _HarvestScreenState extends State<HarvestScreen> {
                     '${_selectedDate.day.toString().padLeft(2, '0')}/${_selectedDate.month.toString().padLeft(2, '0')}/${_selectedDate.year}',
                     style: AppTypography.mono(fontSize: 15, fontWeight: FontWeight.w900),
                   ),
-                  const Icon(Icons.calendar_today_rounded, size: 18, color: AppColors.ink),
+                  Icon(
+                    readOnly ? Icons.lock_outline_rounded : Icons.calendar_today_rounded,
+                    size: 18,
+                    color: readOnly ? AppColors.muted : AppColors.ink,
+                  ),
                 ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Field Keterangan / Kondisi Daun
-          const MicroText('KETERANGAN / KONDISI DAUN', fontSize: 9.5),
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: AppColors.ink, width: 2),
-            ),
-            child: TextField(
-              controller: _noteController,
-              minLines: 2,
-              maxLines: 3,
-              style: AppTypography.mono(fontSize: 13, fontWeight: FontWeight.w600),
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                hintText: 'Misal: Petikan pucuk daun, warna kuning merata',
-                contentPadding: EdgeInsets.zero,
               ),
             ),
           ),
@@ -1325,14 +1383,20 @@ class _HarvestScreenState extends State<HarvestScreen> {
   }
 
   Widget _buildCtaButtonSection() {
+    final isReadOnly = _isViewingSavedStep;
+
     return Column(
       children: [
-        // Tombol Simpan CTA Trapesium Oranye
+        // Tombol Simpan CTA Trapesium Oranye (atau arahkan ke halaman Edit jika petikan sudah tersimpan)
         TrapezoidTabButton(
-          label: _isSavingPetikan ? 'MENYIMPAN DATA...' : 'SIMPAN PETIKAN P$_activeStep',
-          isLoading: _isSavingPetikan,
-          icon: Icons.check_circle_outline_rounded,
-          onPressed: _isSavingPetikan ? null : _saveCurrentPetikan,
+          label: isReadOnly
+              ? 'EDIT PETIKAN P$_activeStep'
+              : (_isSavingPetikan ? 'MENYIMPAN DATA...' : 'SIMPAN PETIKAN P$_activeStep'),
+          isLoading: !isReadOnly && _isSavingPetikan,
+          icon: isReadOnly ? Icons.edit_note_rounded : Icons.check_circle_outline_rounded,
+          onPressed: isReadOnly
+              ? () => _openHarvestEditScreen(_activeStep)
+              : (_isSavingPetikan ? null : _saveCurrentPetikan),
         ),
         const SizedBox(height: 16),
 
